@@ -44,5 +44,11 @@ public:
 
 private:
     //==============================================================================
+    // Declare and initialize an int variable that will be used to hold the position of the buffer.
+    int delayBufferPos = 0;
+
+    // Declare an object of class "Audio Buffer", that can store Audio Data.
+    // Float parameter specifies that the type of stored data will be floating-point numbers.
+    juce::AudioBuffer<float> delayBuffer;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };

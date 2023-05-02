@@ -12,6 +12,9 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
                      #endif
                        )
 {
+    addParameter (new juce::AudioParameterFloat ("gain","Gain", 0.0f, 1.0f, 1.0f));
+    addParameter (new juce::AudioParameterFloat ("feedback", "Delay Feedback", 0.0f, 1.0f, 0.35f));
+    addParameter (new juce::AudioParameterFloat ("mix","Dry / Wet", 0.0f, 1.0f, 0.5f));
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
@@ -86,9 +89,23 @@ void AudioPluginAudioProcessor::changeProgramName (int index, const juce::String
 //==============================================================================
 void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
-    juce::ignoreUnused (sampleRate, samplesPerBlock);
+    // Declare and initialise int varialbe that holds the "echo" length in msec.
+    int delayMilliseconds = 200;
+
+    // Calculates number of delay samples required for the given delay time.
+    // Rounded to nearest int.
+    // sampleRate parameter passed to prepareToPlay method by the JUCE framework,
+    // when the audio processing system is initialised.
+    auto delaySamples = (int) std::round (sampleRate * delayMilliseconds / 1000.0);
+
+    // Set size states number of channels and number of samples per channel in the buffer.
+    delayBuffer.setSize(2, delaySamples);
+
+    // Cleans buffer from preexisting data.
+    delayBuffer.clear();
+
+    // Sets delaybufferpos to 0 each start up.
+    delayBufferPos = 0;
 }
 
 void AudioPluginAudioProcessor::releaseResources()
@@ -145,11 +162,26 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // the samples and the outer loop is handling the channels.
     // Alternatively, you can process the samples with the channels
     // interleaved by keeping the same state.
+    auto& parameters = getParameters();
+    float gain = parameters[0]->getValue();
+    float feedback = parameters[1]->getValue();
+    float mix = parameters[2]->getValue();
+    int delayBufferSize = delayBuffer.getNumSamples();
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        auto* channelData = buffer.getWritePointer (channel);
-        juce::ignoreUnused (channelData);
-        // ..do something to the data...
+        float* channelData = buffer.getWritePointer (channel);
+        int delayPos = delayBufferPos;
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+        {
+            float drySample = channelData[i];
+            float delaySample = delayBuffer.getSample (channel, delayPos) * feedback;
+            delayBuffer.setSample (channel, delayPos, drySample + delaySample);
+            delayPos++;
+            if (delayPos == delayBufferSize)
+                delayPos = 0;
+            channelData[i] = (drySample * (1.0f - mix)) + (delaySample * mix);
+            channelData[i] = channelData[i]*gain;
+        }
     }
 }
 
