@@ -85,9 +85,9 @@ void AudioPluginAudioProcessor::changeProgramName (int index, const juce::String
 }
 
 //==============================================================================
-void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int /*samplesPerBlock*/)
 {
-    // Declare and initialise int varialbe that holds the "echo" length in msec.
+    // Declare and initialise int variable that holds the "echo" length in msec.
     int delayMilliseconds = 200;
 
     // Calculates number of delay samples required for the given delay time.
@@ -139,8 +139,6 @@ bool AudioPluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layou
 void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer& midiMessages)
 {
-    juce::ignoreUnused (midiMessages);
-
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -164,23 +162,36 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     float gain = pointerToFloat("gain");
     float feedback = pointerToFloat("feedback");
     float mix = pointerToFloat("mix");
+
+
     int delayBufferSize = delayBuffer.getNumSamples();
+
+    // Initialize delay buffer position
+    int delayPos = delayBufferPos;
+
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
         float* channelData = buffer.getWritePointer (channel);
-        int delayPos = delayBufferPos;
+
         for (int i = 0; i < buffer.getNumSamples(); ++i)
         {
             float drySample = channelData[i];
+
             float delaySample = delayBuffer.getSample (channel, delayPos) * feedback;
             delayBuffer.setSample (channel, delayPos, drySample + delaySample);
+
+            delayPos = delayBufferPos;
             delayPos++;
             if (delayPos == delayBufferSize)
                 delayPos = 0;
+
             channelData[i] = (drySample * (1.0f - mix)) + (delaySample * mix);
             channelData[i] = channelData[i]*gain;
         }
+        // Update delay buffer position
+        delayBufferPos = delayPos;
     }
+
 }
 
 //==============================================================================
