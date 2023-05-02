@@ -10,11 +10,9 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ), apvts(*this, nullptr, "Parameters", createParameters())
 {
-    addParameter (new juce::AudioParameterFloat ("gain","Gain", 0.0f, 1.0f, 1.0f));
-    addParameter (new juce::AudioParameterFloat ("feedback", "Delay Feedback", 0.0f, 1.0f, 0.35f));
-    addParameter (new juce::AudioParameterFloat ("mix","Dry / Wet", 0.0f, 1.0f, 0.5f));
+
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
@@ -162,10 +160,10 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // the samples and the outer loop is handling the channels.
     // Alternatively, you can process the samples with the channels
     // interleaved by keeping the same state.
-    auto& parameters = getParameters();
-    float gain = parameters[0]->getValue();
-    float feedback = parameters[1]->getValue();
-    float mix = parameters[2]->getValue();
+
+    float gain = pointerToFloat("gain");
+    float feedback = pointerToFloat("feedback");
+    float mix = pointerToFloat("mix");
     int delayBufferSize = delayBuffer.getNumSamples();
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
@@ -212,9 +210,29 @@ void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeI
     juce::ignoreUnused (data, sizeInBytes);
 }
 
+float AudioPluginAudioProcessor::pointerToFloat(juce::String parameterID)
+{
+    auto atomicFloat =apvts.getRawParameterValue(parameterID);
+    auto floatValue = atomicFloat -> load();
+    return floatValue;
+}
+
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new AudioPluginAudioProcessor();
+}
+
+// Declaring function that makes parameters
+juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::createParameters()
+{
+    // Storing parameters as a vector
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("gain","Gain", 0.0f, 1.0f, 1.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("feedback", "Delay Feedback", 0.0f, 1.0f, 0.35f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("mix","Dry / Wet", 0.0f, 1.0f, 0.5f));
+
+    return{ params.begin(), params.end() };
 }
