@@ -28,12 +28,22 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     // ----------------------------------- Mix -----------------------------------
     mix.setSliderStyle(juce::Slider::LinearVertical); // A vertical slider is selected
     mix.setTextBoxStyle(juce::Slider::TextBoxRight, false, 80, 20); // Dimensions of text box showing value
-    mix.setPopupDisplayEnabled(true, false, this); //BPM shown as popup
-    mix.setTextValueSuffix(" %"); // Showing units alongside with value
+    mix.setPopupDisplayEnabled(true, false, this); //dB shown as popup
+    mix.setTextValueSuffix(" dB"); // Showing units alongside with value
 
     addAndMakeVisible (mix);
 
     mixSliderAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(processorRef.apvts, "mix", mix);
+
+    // ----------------------------------- Length -----------------------------------
+    length.setSliderStyle(juce::Slider::LinearVertical); // A vertical slider is selected
+    length.setTextBoxStyle(juce::Slider::TextBoxRight, false, 80, 20); // Dimensions of text box showing value
+    length.setPopupDisplayEnabled(true, false, this); //mS shown as popup
+    length.setTextValueSuffix(" mS"); // Showing units alongside with value
+
+    addAndMakeVisible (length);
+
+    lengthSliderAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(processorRef.apvts, "length", length);
 
     setSize (400, 300);
 }
@@ -64,4 +74,6 @@ void AudioPluginAudioProcessorEditor::resized()
     feedback.setBounds(100, 160, 80, 50);
 
     mix.setBounds(200, 160, 80, 50);
+
+    length.setBounds(300, 160, 80, 50);
 }

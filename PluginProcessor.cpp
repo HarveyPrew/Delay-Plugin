@@ -162,6 +162,12 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     float gain = pointerToFloat("gain");
     float feedback = pointerToFloat("feedback");
     float mix = pointerToFloat("mix");
+    float length = pointerToFloat("length");
+
+    //auto delaySamples = (int) std::round (44100 * length / 1000.0);
+
+    // Set size states number of channels and number of samples per channel in the buffer.
+    //delayBuffer.setSize(2, delaySamples);
 
 
     int delayBufferSize = delayBuffer.getNumSamples();
@@ -246,6 +252,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     params.push_back(std::make_unique<juce::AudioParameterFloat>("gain","Gain", 0.0f, 1.0f, 1.0f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("feedback", "Delay Feedback", 0.0f, 1.0f, 0.35f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("mix","Dry / Wet", 0.0f, 1.0f, 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("length","Delay Time", 0.01f, 1000.0f, 400.0f));
 
     return{ params.begin(), params.end() };
 }
