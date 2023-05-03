@@ -89,21 +89,13 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int /*samplesP
 {
     // Declare and initialise int variable that holds the "echo" length in msec.
     int delayMilliseconds = 400;
+    time = 0;
 
     // Calculates number of delay samples required for the given delay time.
     // Rounded to nearest int.
     // sampleRate parameter passed to prepareToPlay method by the JUCE framework,
     // when the audio processing system is initialised.
-    auto delaySamples = (int) std::round (sampleRate * delayMilliseconds / 1000.0);
-
-    // Set size states number of channels and number of samples per channel in the buffer.
-    delayBuffer.setSize(2, delaySamples);
-
-    // Cleans buffer from preexisting data.
-    delayBuffer.clear();
-
-    // Sets delaybufferpos to 0 each start up.
-    delayBufferPos = 0;
+    updateDelayBuffer(delayMilliseconds, sampleRate);
 }
 
 void AudioPluginAudioProcessor::releaseResources()
@@ -234,6 +226,18 @@ float AudioPluginAudioProcessor::pointerToFloat(juce::String parameterID)
     auto atomicFloat =apvts.getRawParameterValue(parameterID);
     auto floatValue = atomicFloat -> load();
     return floatValue;
+}
+
+void AudioPluginAudioProcessor::updateDelayBuffer(int delayMilliseconds, int sampleRate) {
+    auto delaySamples = (int) std::round (sampleRate * delayMilliseconds / 1000.0);
+    // Set size states number of channels and number of samples per channel in the buffer.
+    delayBuffer.setSize(2, delaySamples);
+
+    // Cleans buffer from preexisting data.
+    delayBuffer.clear();
+
+    // Sets delaybufferpos to 0 each start up.
+    delayBufferPos = 0;
 }
 
 //==============================================================================
