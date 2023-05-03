@@ -88,7 +88,7 @@ void AudioPluginAudioProcessor::changeProgramName (int index, const juce::String
 void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int /*samplesPerBlock*/)
 {
     // Declare and initialise int variable that holds the "echo" length in msec.
-    int delayMilliseconds = 200;
+    int delayMilliseconds = 400;
 
     // Calculates number of delay samples required for the given delay time.
     // Rounded to nearest int.
