@@ -173,6 +173,8 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     {
         float* channelData = buffer.getWritePointer (channel);
 
+        delayPos = delayBufferPos;
+
         for (int i = 0; i < buffer.getNumSamples(); ++i)
         {
             float drySample = channelData[i];
@@ -180,7 +182,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             float delaySample = delayBuffer.getSample (channel, delayPos) * feedback;
             delayBuffer.setSample (channel, delayPos, drySample + delaySample);
 
-            delayPos = delayBufferPos;
+            //delayPos = delayBufferPos;
             delayPos++;
             if (delayPos == delayBufferSize)
                 delayPos = 0;
@@ -189,9 +191,9 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             channelData[i] = channelData[i]*gain;
         }
         // Update delay buffer position
-        delayBufferPos = delayPos;
-    }
 
+    }
+    delayBufferPos = delayPos;
 }
 
 //==============================================================================
