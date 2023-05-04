@@ -141,32 +141,20 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-
     float gain = pointerToFloat("gain");
     float feedback = pointerToFloat("feedback");
     float mix = pointerToFloat("mix");
     float length = pointerToFloat("length");
 
-    //auto delaySamples = (int) std::round (44100 * length / 1000.0);
-
-    // Set size states number of channels and number of samples per channel in the buffer.
-    //delayBuffer.setSize(2, delaySamples);
-
-
-    auto bufferSize = buffer.getNumSamples();
-    auto delayBufferSize = delayBuffer.getNumSamples();
-
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        // enables us to copy data from one buffer to another.
-        auto* channelData = buffer.getWritePointer (channel);
-        fillBuffer(channel, bufferSize, delayBufferSize, channelData);
-        readFromBuffer(channel, bufferSize, delayBufferSize, buffer, delayBuffer, length);
 
+        fillBuffer(buffer, channel);
+        readFromBuffer(channel, buffer, delayBuffer, length);
+        fillBuffer(buffer, channel);
     }
 
-    writePosition += bufferSize;
-    writePosition %= delayBufferSize;
+    updateBufferPositions (buffer, delayBuffer);
 }
 
 //==============================================================================
@@ -215,13 +203,18 @@ void AudioPluginAudioProcessor::updateDelayBuffer(int delayMilliseconds, int sam
     delayBufferPos = 0;
 }
 
-void AudioPluginAudioProcessor::fillBuffer(int channel, int bufferSize, int delayBufferSize, float* channelData)
+void AudioPluginAudioProcessor::fillBuffer(juce::AudioBuffer<float>& buffer, int channel)
 {
+    auto bufferSize = buffer.getNumSamples();
+    auto delayBufferSize = delayBuffer.getNumSamples();
+    // enables us to copy data from one buffer to another.
+    auto* channelData = buffer.getWritePointer (channel);
+
     // Check to see if main buffer copies to delay buffer without needing to wrap
     if (delayBufferSize > bufferSize + writePosition)
     {
         // Copy main buffer contents to delay buffer
-        delayBuffer.copyFrom(channel, writePosition, channelData, bufferSize);
+        delayBuffer.copyFrom(channel, writePosition, buffer.getWritePointer (channel), bufferSize);
     }
         // if no
     else
@@ -230,18 +223,20 @@ void AudioPluginAudioProcessor::fillBuffer(int channel, int bufferSize, int dela
         auto numSamplesToEnd = delayBufferSize - writePosition;
 
         // Copy that amount of contents to the end...
-        delayBuffer.copyFrom(channel, writePosition, channelData, numSamplesToEnd);
+        delayBuffer.copyFrom(channel, writePosition, buffer.getWritePointer (channel), numSamplesToEnd);
 
         // Calculate how much contents is remaining to copy
         auto numSamplesAtStart = bufferSize - numSamplesToEnd;
 
         // Copy remaining amount to beginning of delay buffer
-        delayBuffer.copyFrom(channel, 0, channelData + numSamplesToEnd, numSamplesAtStart);
+        delayBuffer.copyFrom(channel, 0, buffer.getWritePointer(channel, numSamplesToEnd), numSamplesAtStart);
     }
 }
 
-void AudioPluginAudioProcessor::readFromBuffer(int channel, int bufferSize, int delayBufferSize, juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, float& length)
+void AudioPluginAudioProcessor::readFromBuffer(int channel, juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, float& length)
 {
+    auto bufferSize = buffer.getNumSamples();
+    auto delayBufferSize = delayBuffer.getNumSamples();
     // 1 seconds of audio from in the past
     auto readPosition = writePosition - (getSampleRate() * length);
 
@@ -267,6 +262,14 @@ void AudioPluginAudioProcessor::readFromBuffer(int channel, int bufferSize, int 
     }
 }
 
+void AudioPluginAudioProcessor::updateBufferPositions(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer)
+{
+    auto bufferSize = buffer.getNumSamples();
+    auto delayBufferSize = delayBuffer.getNumSamples();
+
+    writePosition += bufferSize;
+    writePosition %= delayBufferSize;
+}
 
 //==============================================================================
 // This creates new instances of the plugin..
