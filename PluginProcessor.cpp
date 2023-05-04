@@ -161,36 +161,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         // enables us to copy data from one buffer to another.
         auto* channelData = buffer.getWritePointer (channel);
         fillBuffer(channel, bufferSize, delayBufferSize, channelData);
-
-        // 1 seconds of audio from in the past
-        auto readPosition = writePosition - getSampleRate();
-
-        if (readPosition < 0)
-        {
-            readPosition += delayBufferSize;
-        }
-
-        auto g = 0.7f;
-
-        if (readPosition + bufferSize < delayBufferSize)
-        {
-            buffer.addFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), bufferSize, g, g);
-        }
-
-        else
-        {
-            auto numSamplesToEnd = delayBufferSize - readPosition;
-            buffer.addFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), numSamplesToEnd, g, g);
-
-            auto numSamplesAtStart = bufferSize - numSamplesToEnd;
-            buffer.addFromWithRamp(channel, numSamplesToEnd, delayBuffer.getReadPointer(channel, 0), numSamplesAtStart, g, g);
-        }
-
-
-        // writePosition = "Where is our audio currently?"
-        // readPosition = writePosition - sampleRate
-
-        // -44100
+        readFromBuffer(channel, bufferSize, delayBufferSize, buffer, delayBuffer, length);
 
     }
 
@@ -269,6 +240,34 @@ void AudioPluginAudioProcessor::fillBuffer(int channel, int bufferSize, int dela
     }
 }
 
+void AudioPluginAudioProcessor::readFromBuffer(int channel, int bufferSize, int delayBufferSize, juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, float& length)
+{
+    // 1 seconds of audio from in the past
+    auto readPosition = writePosition - (getSampleRate() * length);
+
+    if (readPosition < 0)
+    {
+        readPosition += delayBufferSize;
+    }
+
+    auto g = 0.7f;
+
+    if (readPosition + bufferSize < delayBufferSize)
+    {
+        buffer.addFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), bufferSize, g, g);
+    }
+
+    else
+    {
+        auto numSamplesToEnd = delayBufferSize - readPosition;
+        buffer.addFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), numSamplesToEnd, g, g);
+
+        auto numSamplesAtStart = bufferSize - numSamplesToEnd;
+        buffer.addFromWithRamp(channel, numSamplesToEnd, delayBuffer.getReadPointer(channel, 0), numSamplesAtStart, g, g);
+    }
+}
+
+
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
@@ -285,7 +284,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     params.push_back(std::make_unique<juce::AudioParameterFloat>("gain","Gain", 0.0f, 1.0f, 1.0f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("feedback", "Delay Feedback", 0.0f, 1.0f, 0.35f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("mix","Dry / Wet", 0.0f, 1.0f, 0.5f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("length","Delay Time", 0.01f, 1000.0f, 400.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("length","Delay Time", 0.01f, 2.0f, 1.0f));
 
     return{ params.begin(), params.end() };
 }

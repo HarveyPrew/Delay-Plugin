@@ -62,5 +62,6 @@ private:
 
     void updateDelayBuffer(int delayMilliseconds, int sampleRate);
     void fillBuffer(int channel, int bufferSize, int delayBufferSize, float* channelData);
+    void readFromBuffer(int channel, int bufferSize, int delayBufferSize, juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, float& length);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };
