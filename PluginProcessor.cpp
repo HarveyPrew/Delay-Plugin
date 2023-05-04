@@ -90,12 +90,14 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int /*samplesP
     // Declare and initialise int variable that holds the "echo" length in msec.
     int delayMilliseconds = 400;
     time = 0;
+    auto delayBufferSize = sampleRate * 2.0;
+    delayBuffer.setSize(getTotalNumOutputChannels(), (int) delayBufferSize);
 
     // Calculates number of delay samples required for the given delay time.
     // Rounded to nearest int.
     // sampleRate parameter passed to prepareToPlay method by the JUCE framework,
     // when the audio processing system is initialised.
-    updateDelayBuffer(delayMilliseconds, sampleRate);
+    //updateDelayBuffer(delayMilliseconds, sampleRate);
 }
 
 void AudioPluginAudioProcessor::releaseResources()
@@ -160,6 +162,36 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         auto* channelData = buffer.getWritePointer (channel);
         fillBuffer(channel, bufferSize, delayBufferSize, channelData);
 
+        // 1 seconds of audio from in the past
+        auto readPosition = writePosition - getSampleRate();
+
+        if (readPosition < 0)
+        {
+            readPosition += delayBufferSize;
+        }
+
+        auto g = 0.7f;
+
+        if (readPosition + bufferSize < delayBufferSize)
+        {
+            buffer.addFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), bufferSize, g, g);
+        }
+
+        else
+        {
+            auto numSamplesToEnd = delayBufferSize - readPosition;
+            buffer.addFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), numSamplesToEnd, g, g);
+
+            auto numSamplesAtStart = bufferSize - numSamplesToEnd;
+            buffer.addFromWithRamp(channel, numSamplesToEnd, delayBuffer.getReadPointer(channel, 0), numSamplesAtStart, g, g);
+        }
+
+
+        // writePosition = "Where is our audio currently?"
+        // readPosition = writePosition - sampleRate
+
+        // -44100
+
     }
 
     writePosition += bufferSize;
@@ -218,7 +250,7 @@ void AudioPluginAudioProcessor::fillBuffer(int channel, int bufferSize, int dela
     if (delayBufferSize > bufferSize + writePosition)
     {
         // Copy main buffer contents to delay buffer
-        delayBuffer.copyFromWithRamp(channel, writePosition, channelData, bufferSize, 0.1f,0.1f);
+        delayBuffer.copyFrom(channel, writePosition, channelData, bufferSize);
     }
         // if no
     else
@@ -227,13 +259,13 @@ void AudioPluginAudioProcessor::fillBuffer(int channel, int bufferSize, int dela
         auto numSamplesToEnd = delayBufferSize - writePosition;
 
         // Copy that amount of contents to the end...
-        delayBuffer.copyFromWithRamp(channel, writePosition, channelData, numSamplesToEnd, 0.1f, 0.1f);
+        delayBuffer.copyFrom(channel, writePosition, channelData, numSamplesToEnd);
 
         // Calculate how much contents is remaining to copy
         auto numSamplesAtStart = bufferSize - numSamplesToEnd;
 
         // Copy remaining amount to beginning of delay buffer
-        delayBuffer.copyFromWithRamp(channel, 0, channelData, numSamplesAtStart, 0.1f, 0.1f);
+        delayBuffer.copyFrom(channel, 0, channelData + numSamplesToEnd, numSamplesAtStart);
     }
 }
 
