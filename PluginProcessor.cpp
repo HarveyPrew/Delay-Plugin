@@ -135,21 +135,10 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
+
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
 
     float gain = pointerToFloat("gain");
     float feedback = pointerToFloat("feedback");
@@ -162,36 +151,19 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     //delayBuffer.setSize(2, delaySamples);
 
 
-    int delayBufferSize = delayBuffer.getNumSamples();
-
-    // Initialize delay buffer position
-    int delayPos = delayBufferPos;
+    auto bufferSize = buffer.getNumSamples();
+    auto delayBufferSize = delayBuffer.getNumSamples();
 
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        float* channelData = buffer.getWritePointer (channel);
-
-        delayPos = delayBufferPos;
-
-        for (int i = 0; i < buffer.getNumSamples(); ++i)
-        {
-            float drySample = channelData[i];
-
-            float delaySample = delayBuffer.getSample (channel, delayPos) * feedback;
-            delayBuffer.setSample (channel, delayPos, drySample + delaySample);
-
-            //delayPos = delayBufferPos;
-            delayPos++;
-            if (delayPos == delayBufferSize)
-                delayPos = 0;
-
-            channelData[i] = (drySample * (1.0f - mix)) + (delaySample * mix);
-            channelData[i] = channelData[i]*gain;
-        }
-        // Update delay buffer position
+        // enables us to copy data from one buffer to another.
+        auto* channelData = buffer.getWritePointer (channel);
+        fillBuffer(channel, bufferSize, delayBufferSize, channelData);
 
     }
-    delayBufferPos = delayPos;
+
+    writePosition += bufferSize;
+    writePosition %= delayBufferSize;
 }
 
 //==============================================================================
@@ -231,13 +203,38 @@ float AudioPluginAudioProcessor::pointerToFloat(juce::String parameterID)
 void AudioPluginAudioProcessor::updateDelayBuffer(int delayMilliseconds, int sampleRate) {
     auto delaySamples = (int) std::round (sampleRate * delayMilliseconds / 1000.0);
     // Set size states number of channels and number of samples per channel in the buffer.
-    delayBuffer.setSize(2, delaySamples);
+    delayBuffer.setSize(getTotalNumOutputChannels(), delaySamples);
 
     // Cleans buffer from preexisting data.
     delayBuffer.clear();
 
     // Sets delaybufferpos to 0 each start up.
     delayBufferPos = 0;
+}
+
+void AudioPluginAudioProcessor::fillBuffer(int channel, int bufferSize, int delayBufferSize, float* channelData)
+{
+    // Check to see if main buffer copies to delay buffer without needing to wrap
+    if (delayBufferSize > bufferSize + writePosition)
+    {
+        // Copy main buffer contents to delay buffer
+        delayBuffer.copyFromWithRamp(channel, writePosition, channelData, bufferSize, 0.1f,0.1f);
+    }
+        // if no
+    else
+    {
+        // Determine how much space is left at the end of the delay buffer
+        auto numSamplesToEnd = delayBufferSize - writePosition;
+
+        // Copy that amount of contents to the end...
+        delayBuffer.copyFromWithRamp(channel, writePosition, channelData, numSamplesToEnd, 0.1f, 0.1f);
+
+        // Calculate how much contents is remaining to copy
+        auto numSamplesAtStart = bufferSize - numSamplesToEnd;
+
+        // Copy remaining amount to beginning of delay buffer
+        delayBuffer.copyFromWithRamp(channel, 0, channelData, numSamplesAtStart, 0.1f, 0.1f);
+    }
 }
 
 //==============================================================================

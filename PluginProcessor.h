@@ -58,6 +58,9 @@ private:
     // Declare an object of class "Audio Buffer", that can store Audio Data.
     // Float parameter specifies that the type of stored data will be floating-point numbers.
     juce::AudioBuffer<float> delayBuffer;
+    int writePosition { 0 };
+
     void updateDelayBuffer(int delayMilliseconds, int sampleRate);
+    void fillBuffer(int channel, int bufferSize, int delayBufferSize, float* channelData);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };
