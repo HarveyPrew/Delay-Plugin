@@ -142,15 +142,13 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         buffer.clear (i, 0, buffer.getNumSamples());
 
     float gain = pointerToFloat("gain");
-    float feedback = pointerToFloat("feedback");
     float mix = pointerToFloat("mix");
-    float length = pointerToFloat("length");
 
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
 
         fillBuffer(buffer, channel);
-        readFromBuffer(channel, buffer, delayBuffer, length);
+        readFromBuffer(channel, buffer, delayBuffer);
         fillBuffer(buffer, channel);
     }
 
@@ -165,7 +163,7 @@ bool AudioPluginAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* AudioPluginAudioProcessor::createEditor()
 {
-    return new AudioPluginAudioProcessorEditor (*this);
+    return new juce::GenericAudioProcessorEditor (*this);
 }
 
 //==============================================================================
@@ -233,19 +231,24 @@ void AudioPluginAudioProcessor::fillBuffer(juce::AudioBuffer<float>& buffer, int
     }
 }
 
-void AudioPluginAudioProcessor::readFromBuffer(int channel, juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, float& length)
+void AudioPluginAudioProcessor::readFromBuffer(int channel, juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer)
 {
     auto bufferSize = buffer.getNumSamples();
     auto delayBufferSize = delayBuffer.getNumSamples();
-    // 1 seconds of audio from in the past
-    auto readPosition = writePosition - (getSampleRate() * length);
+
+    float length = pointerToFloat("length");
+    float feedback = pointerToFloat("feedback");
+
+    // delayMs
+    auto readPosition = writePosition - (length);
 
     if (readPosition < 0)
     {
         readPosition += delayBufferSize;
     }
 
-    auto g = 0.7f;
+    // feedback
+    auto g = feedback;
 
     if (readPosition + bufferSize < delayBufferSize)
     {
@@ -287,7 +290,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     params.push_back(std::make_unique<juce::AudioParameterFloat>("gain","Gain", 0.0f, 1.0f, 1.0f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("feedback", "Delay Feedback", 0.0f, 1.0f, 0.35f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("mix","Dry / Wet", 0.0f, 1.0f, 0.5f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("length","Delay Time", 0.01f, 2.0f, 1.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("length","Delay Time", 0.01f, 96000.0f, 1.0f));
 
     return{ params.begin(), params.end() };
 }
