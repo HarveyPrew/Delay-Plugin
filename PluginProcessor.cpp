@@ -93,11 +93,7 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int /*samplesP
     auto delayBufferSize = sampleRate * 2.0;
     delayBuffer.setSize(getTotalNumOutputChannels(), (int) delayBufferSize);
 
-    // Calculates number of delay samples required for the given delay time.
-    // Rounded to nearest int.
-    // sampleRate parameter passed to prepareToPlay method by the JUCE framework,
-    // when the audio processing system is initialised.
-    //updateDelayBuffer(delayMilliseconds, sampleRate);
+    length.reset (sampleRate, 0.0005);
 }
 
 void AudioPluginAudioProcessor::releaseResources()
@@ -141,8 +137,8 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    float gain = pointerToFloat("gain");
     float mix = pointerToFloat("mix");
+
 
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
@@ -236,11 +232,13 @@ void AudioPluginAudioProcessor::readFromBuffer(int channel, juce::AudioBuffer<fl
     auto bufferSize = buffer.getNumSamples();
     auto delayBufferSize = delayBuffer.getNumSamples();
 
-    float length = pointerToFloat("length");
+    float l = pointerToFloat("length");
+
+    length.setTargetValue(l);
     float feedback = pointerToFloat("feedback");
 
     // delayMs
-    auto readPosition = writePosition - (length);
+    auto readPosition = writePosition - (length.skip(bufferSize));
 
     if (readPosition < 0)
     {
