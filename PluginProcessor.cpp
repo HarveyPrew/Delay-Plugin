@@ -88,12 +88,12 @@ void AudioPluginAudioProcessor::changeProgramName (int index, const juce::String
 void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int /*samplesPerBlock*/)
 {
     // Declare and initialise int variable that holds the "echo" length in msec.
-    int delayMilliseconds = 400;
-    time = 0;
     auto delayBufferSize = sampleRate * 2.0;
+
+
     delayBuffer.setSize(getTotalNumOutputChannels(), (int) delayBufferSize);
 
-    length.reset (sampleRate, 0.0005);
+    length.reset (sampleRate, 0.001);
 }
 
 void AudioPluginAudioProcessor::releaseResources()
@@ -133,22 +133,21 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
     float mix = pointerToFloat("mix");
 
-
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-
         fillBuffer(buffer, channel);
-        readFromBuffer(channel, buffer, delayBuffer);
+        readFromBuffer(buffer, delayBuffer, channel);
         fillBuffer(buffer, channel);
     }
 
     updateBufferPositions (buffer, delayBuffer);
+
+
 }
 
 //==============================================================================
@@ -185,22 +184,11 @@ float AudioPluginAudioProcessor::pointerToFloat(juce::String parameterID)
     return floatValue;
 }
 
-void AudioPluginAudioProcessor::updateDelayBuffer(int delayMilliseconds, int sampleRate) {
-    auto delaySamples = (int) std::round (sampleRate * delayMilliseconds / 1000.0);
-    // Set size states number of channels and number of samples per channel in the buffer.
-    delayBuffer.setSize(getTotalNumOutputChannels(), delaySamples);
-
-    // Cleans buffer from preexisting data.
-    delayBuffer.clear();
-
-    // Sets delaybufferpos to 0 each start up.
-    delayBufferPos = 0;
-}
-
 void AudioPluginAudioProcessor::fillBuffer(juce::AudioBuffer<float>& buffer, int channel)
 {
     auto bufferSize = buffer.getNumSamples();
     auto delayBufferSize = delayBuffer.getNumSamples();
+
     // enables us to copy data from one buffer to another.
     auto* channelData = buffer.getWritePointer (channel);
 
@@ -227,7 +215,7 @@ void AudioPluginAudioProcessor::fillBuffer(juce::AudioBuffer<float>& buffer, int
     }
 }
 
-void AudioPluginAudioProcessor::readFromBuffer(int channel, juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer)
+void AudioPluginAudioProcessor::readFromBuffer(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, int channel)
 {
     auto bufferSize = buffer.getNumSamples();
     auto delayBufferSize = delayBuffer.getNumSamples();
@@ -237,8 +225,11 @@ void AudioPluginAudioProcessor::readFromBuffer(int channel, juce::AudioBuffer<fl
     length.setTargetValue(l);
     float feedback = pointerToFloat("feedback");
 
+    float lengthValue = length.getNextValue();
+
     // delayMs
-    auto readPosition = writePosition - (length.skip(bufferSize));
+    auto readPosition = writePosition - lengthValue;
+
 
     if (readPosition < 0)
     {
@@ -255,9 +246,12 @@ void AudioPluginAudioProcessor::readFromBuffer(int channel, juce::AudioBuffer<fl
 
     else
     {
+        // adding samples at the end
         auto numSamplesToEnd = delayBufferSize - readPosition;
         buffer.addFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), numSamplesToEnd, g, g);
 
+
+        // adding samples to the beginning
         auto numSamplesAtStart = bufferSize - numSamplesToEnd;
         buffer.addFromWithRamp(channel, numSamplesToEnd, delayBuffer.getReadPointer(channel, 0), numSamplesAtStart, g, g);
     }
@@ -288,7 +282,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     params.push_back(std::make_unique<juce::AudioParameterFloat>("gain","Gain", 0.0f, 1.0f, 1.0f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("feedback", "Delay Feedback", 0.0f, 1.0f, 0.35f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("mix","Dry / Wet", 0.0f, 1.0f, 0.5f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("length","Delay Time", 0.01f, 96000.0f, 1.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("length","Delay Time", 44.1f, 96000.0f, 44100.0f));
 
     return{ params.begin(), params.end() };
 }
