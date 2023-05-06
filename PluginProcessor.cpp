@@ -133,20 +133,37 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
     auto gain = getParameterValue("gain");
+    auto phase = getParameterValue("phase");
 
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+        delayBuffer.clear(i, 0, delayBuffer.getNumChannels());
+
+
+    auto bufferSize = buffer.getNumSamples();
+    auto delayBufferSize = delayBuffer.getNumSamples();
 
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        fillBuffer(buffer, channel);
-        readFromBuffer(buffer, delayBuffer, channel);
-        fillBuffer(buffer, channel);
-
         auto* channelData = buffer.getWritePointer(channel);
-        for (int i=0; i<buffer.getNumSamples(); ++i)
-            channelData[i] *= gain;
+        fillBuffer(buffer, channel, channelData, bufferSize, delayBufferSize);
+        readFromBuffer(buffer, delayBuffer, channel, bufferSize, delayBufferSize);
+        fillBuffer(buffer, channel, channelData, bufferSize, delayBufferSize);
+
+
+        for (int sample=0; sample < buffer.getNumSamples(); ++sample)
+            if (phase == 1)
+            {
+                // Phase turned on
+                channelData[sample] *= juce::Decibels::decibelsToGain(gain) * -1;
+            }
+            else
+            {
+                // Phase turned off
+                channelData[sample] *= juce::Decibels::decibelsToGain(gain);
+            }
     }
 
     updateBufferPositions (buffer, delayBuffer);
@@ -188,16 +205,13 @@ float AudioPluginAudioProcessor::getParameterValue(juce::String parameterID)
     return floatValue;
 }
 
-void AudioPluginAudioProcessor::fillBuffer(juce::AudioBuffer<float>& buffer, int channel)
+void AudioPluginAudioProcessor::fillBuffer(juce::AudioBuffer<float>& buffer, int channel, float* channelData, int bufferSize, int delayBufferSize)
 {
-    auto bufferSize = buffer.getNumSamples();
-    auto delayBufferSize = delayBuffer.getNumSamples();
-
     // Check to see if main buffer copies to delay buffer without needing to wrap
     if (delayBufferSize > bufferSize + writePosition)
     {
         // Copy main buffer contents to delay buffer
-        delayBuffer.copyFrom(channel, writePosition, buffer.getWritePointer (channel), bufferSize);
+        delayBuffer.copyFrom(channel, writePosition, channelData, bufferSize);
     }
         // if no
     else
@@ -206,33 +220,29 @@ void AudioPluginAudioProcessor::fillBuffer(juce::AudioBuffer<float>& buffer, int
         auto numSamplesToEnd = delayBufferSize - writePosition;
 
         // Copy that amount of contents to the end...
-        delayBuffer.copyFrom(channel, writePosition, buffer.getWritePointer (channel), numSamplesToEnd);
+        delayBuffer.copyFrom(channel, writePosition, channelData, numSamplesToEnd);
 
         // Calculate how much contents is remaining to copy
         auto numSamplesAtStart = bufferSize - numSamplesToEnd;
 
-        // Copy remaining amount to beginning of delay buffer
+        // Copy remaining amount to beginning of delay buffer. Need to state in index that we are reading from numSamplesToEnd.
         delayBuffer.copyFrom(channel, 0, buffer.getWritePointer(channel, numSamplesToEnd), numSamplesAtStart);
     }
 }
 
-void AudioPluginAudioProcessor::readFromBuffer(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, int channel)
+void AudioPluginAudioProcessor::readFromBuffer(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, int channel, int bufferSize, int delayBufferSize)
 {
-    auto bufferSize = buffer.getNumSamples();
-    auto delayBufferSize = delayBuffer.getNumSamples();
 
     auto l = getParameterValue("length");
-
     length.setTargetValue(l);
-    auto feedback = getParameterValue("feedback");
-
     auto lengthValue = length.getNextValue();
 
+    auto feedback = getParameterValue("feedback");
 
     // delayMs
     auto readPosition = (writePosition - getSampleRate() * pow(10, -3) * lengthValue);
 
-
+    // when readposition is less than 0 it sets to the correct point near the end of the buffer.
     if (readPosition < 0)
     {
         readPosition += delayBufferSize;
@@ -241,6 +251,7 @@ void AudioPluginAudioProcessor::readFromBuffer(juce::AudioBuffer<float>& buffer,
     // feedback
     auto g = feedback;
 
+    //If readposition does not need to wrap around
     if (readPosition + bufferSize < delayBufferSize)
     {
         buffer.addFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), bufferSize, g, g);
@@ -264,7 +275,10 @@ void AudioPluginAudioProcessor::updateBufferPositions(juce::AudioBuffer<float>& 
     auto bufferSize = buffer.getNumSamples();
     auto delayBufferSize = delayBuffer.getNumSamples();
 
+    // Adds the writePosition + 1 buffer size.
     writePosition += bufferSize;
+
+    // Allows it to wrap once the writePosition is about to become greater than the delayBufferSize.
     writePosition %= delayBufferSize;
 }
 
@@ -281,10 +295,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     // Storing parameters as a vector
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("gain","Gain", 0.0f, 1.0f, 1.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("gain","Gain", -96.0f, 48.0f, 0.0f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("feedback", "Delay Feedback", 0.0f, 1.0f, 0.35f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("mix","Dry / Wet", 0.0f, 1.0f, 0.5f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("length","Delay Time", 20.0f, 2000.0f, 500.0f));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"phase", 1}, "Phase", 0));
 
     return{ params.begin(), params.end() };
 }
