@@ -49,7 +49,7 @@ private:
 
     // Defining function that makes parameters.
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
-    float pointerToFloat (juce::String parameterID);
+    float getParameterValue (juce::String parameterID);
     //==============================================================================
     // Declare and initialize an int variable that will be used to hold the position of the buffer.
     int delayBufferPos = 0;
@@ -64,5 +64,6 @@ private:
     void readFromBuffer(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, int channel);
     void updateBufferPositions(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer);
     juce::LinearSmoothedValue<float> length { 0.0f };
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };
