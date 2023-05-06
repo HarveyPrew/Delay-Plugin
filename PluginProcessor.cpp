@@ -132,6 +132,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
+    auto gain = getParameterValue("gain");
 
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
@@ -142,6 +143,10 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         fillBuffer(buffer, channel);
         readFromBuffer(buffer, delayBuffer, channel);
         fillBuffer(buffer, channel);
+
+        auto* channelData = buffer.getWritePointer(channel);
+        for (int i=0; i<buffer.getNumSamples(); ++i)
+            channelData[i] *= gain;
     }
 
     updateBufferPositions (buffer, delayBuffer);
@@ -216,16 +221,16 @@ void AudioPluginAudioProcessor::readFromBuffer(juce::AudioBuffer<float>& buffer,
     auto bufferSize = buffer.getNumSamples();
     auto delayBufferSize = delayBuffer.getNumSamples();
 
-    float l = getParameterValue("length");
+    auto l = getParameterValue("length");
 
     length.setTargetValue(l);
-    float feedback = getParameterValue("feedback");
+    auto feedback = getParameterValue("feedback");
 
-    float lengthValue = length.getNextValue();
+    auto lengthValue = length.getNextValue();
 
 
     // delayMs
-    auto readPosition = writePosition - 44100 * pow(10, -3) * lengthValue;
+    auto readPosition = (writePosition - getSampleRate() * pow(10, -3) * lengthValue);
 
 
     if (readPosition < 0)
