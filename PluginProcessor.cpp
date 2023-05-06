@@ -188,7 +188,7 @@ bool AudioPluginAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* AudioPluginAudioProcessor::createEditor()
 {
-    return new juce::GenericAudioProcessorEditor (*this);
+    return new AudioPluginAudioProcessorEditor (*this);
 }
 
 //==============================================================================
@@ -298,7 +298,7 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
     return new AudioPluginAudioProcessor();
 }
 
-// Declaring function that makes parameters
+// Implementing function that makes the parameters.
 juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::createParameters()
 {
     // Storing parameters as a vector
