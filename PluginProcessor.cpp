@@ -132,8 +132,11 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
+
+    // Calling parameter values
     auto gain = getParameterValue("gain");
     auto phase = getParameterValue("phase");
+    auto toggle = getParameterValue("toggle");
 
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
@@ -147,23 +150,29 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        auto* channelData = buffer.getWritePointer(channel);
-        fillBuffer(buffer, channel, channelData, bufferSize, delayBufferSize);
-        readFromBuffer(buffer, delayBuffer, channel, bufferSize, delayBufferSize);
-        fillBuffer(buffer, channel, channelData, bufferSize, delayBufferSize);
+        if (toggle == 0)
+        {
+            continue;
+        }
+        else
+        {
+            auto* channelData = buffer.getWritePointer(channel);
+            fillBuffer(buffer, channel, channelData, bufferSize, delayBufferSize);
+            readFromBuffer(buffer, delayBuffer, channel, bufferSize, delayBufferSize);
+            fillBuffer(buffer, channel, channelData, bufferSize, delayBufferSize);
 
-
-        for (int sample=0; sample < buffer.getNumSamples(); ++sample)
-            if (phase == 1)
-            {
-                // Phase turned on
-                channelData[sample] *= juce::Decibels::decibelsToGain(gain) * -1;
-            }
-            else
-            {
-                // Phase turned off
-                channelData[sample] *= juce::Decibels::decibelsToGain(gain);
-            }
+            for (int sample=0; sample < buffer.getNumSamples(); ++sample)
+                if (phase == 1)
+                {
+                    // Phase turned on
+                    channelData[sample] *= juce::Decibels::decibelsToGain(gain) * -1;
+                }
+                else
+                {
+                    // Phase turned off
+                    channelData[sample] *= juce::Decibels::decibelsToGain(gain);
+                }
+        }
     }
 
     updateBufferPositions (buffer, delayBuffer);
@@ -300,6 +309,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     params.push_back(std::make_unique<juce::AudioParameterFloat>("mix","Dry / Wet", 0.0f, 1.0f, 0.5f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("length","Delay Time", 20.0f, 2000.0f, 500.0f));
     params.push_back(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"phase", 1}, "Phase", 0));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"toggle", 1}, "On/Off", 1));
 
     return{ params.begin(), params.end() };
 }
