@@ -10,13 +10,32 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
                                   .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
 #endif
-), apvts(*this, nullptr, "Parameters", createParameters())
+), treeState(*this, nullptr, "PARAMETERS", createParameterLayout())
 {
-
+    treeState.addParameterListener("delay", this);
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
 {
+    treeState.removeParameterListener("delay", this);
+}
+
+juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::createParameterLayout()
+{
+    std::vector <std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    auto pDelay = std::make_unique<juce::AudioParameterFloat>("delay", "Delay", 0.01f, 1000.0f, 500.0f);
+    auto mix = std::make_unique<juce::AudioParameterFloat>("mix", "Mix", 0.01f, 100.0f, 50.0f);
+
+    params.push_back(std::move(pDelay));
+    params.push_back(std::move(mix));
+
+    return { params.begin(), params.end() };
+}
+
+void AudioPluginAudioProcessor::parameterChanged(const juce::String &parameterID, float newValue)
+{
+    delayModule.setDelay(newValue / 1000.0f * getSampleRate());
 }
 
 //==============================================================================
@@ -85,16 +104,18 @@ void AudioPluginAudioProcessor::changeProgramName (int index, const juce::String
 }
 
 //==============================================================================
-void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int /*samplesPerBlock*/)
+void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Declare and initialise int variable that holds the "echo" length in msec.
-    auto delayBufferSize = sampleRate * 2.0;
+    // Initialize spec for dsp modules
+    juce::dsp::ProcessSpec spec;
+    spec.maximumBlockSize = samplesPerBlock;
+    spec.sampleRate = sampleRate;
+    spec.numChannels = getTotalNumOutputChannels();
 
-
-    delayBuffer.setSize(getTotalNumOutputChannels(), (int) delayBufferSize);
-    bufferWet.setSize(getTotalNumOutputChannels(), (int) 512);
-
-    length.reset (sampleRate, 0.001);
+    delayModule.prepare(spec);
+    delayModule.reset();
+    std::fill (lastDelayOutput.begin(), lastDelayOutput.end(), 0.0f);
+    delayModule.setDelay(treeState.getRawParameterValue("delay")->load() / 1000.0f * getSampleRate());
 }
 
 void AudioPluginAudioProcessor::releaseResources()
@@ -134,55 +155,30 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // Calling parameter values
-    auto gain = getParameterValue("gain");
-    auto phase = getParameterValue("phase");
-    auto mix = getParameterValue("mix");
-    auto toggle = getParameterValue("toggle");
+    const auto numChannels = juce::jmax (totalNumInputChannels, totalNumOutputChannels);
 
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+    auto audioBlock = juce::dsp::AudioBlock<float> (buffer).getSubsetChannelBlock (0, (size_t) numChannels);
+    auto context = juce::dsp::ProcessContextReplacing<float>(audioBlock);
 
-    auto bufferSize = buffer.getNumSamples();
+    const auto& input = context.getInputBlock();
+    const auto& output = context.getOutputBlock();
 
-    // Popped this here to see if the bufferWet
-    auto bufferSizeWet = bufferWet.getNumSamples();
-    auto delayBufferSize = delayBuffer.getNumSamples();
 
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+    for (size_t channel = 0; channel < numChannels; ++channel)
     {
-        // Toggle off
-        if (toggle == 0)
+
+        auto* samplesIn = input.getChannelPointer (channel);
+        auto* samplesOut = output.getChannelPointer (channel);
+
+        for (size_t sample = 0; sample < input.getNumSamples(); ++sample)
         {
-            continue;
-        }
+            auto input = samplesIn[sample];
+            delayModule.pushSample((int)channel, input);
+            samplesOut[sample] = input*treeState.getRawParameterValue("mix")->load()*0.01 + delayModule.popSample((int)channel);
+            //samplesOut[sample] = input * treeState.getRawParameterValue("mix")->load()*0.01) + delayModule.popSample((int)channel);
 
-            // Toggle on
-        else
-        {
-            // returns a pointer to the start of the memory block that holds audio samples for the channel.
-            auto* channelData = buffer.getWritePointer(channel);
-
-            // channelData for the wet buffer, this is used to fill back the delaybuffer
-            auto* channelDataWet = bufferWet.getWritePointer(channel);
-
-            // Function used to feed main buffer into delayBuffer
-            fillBuffer(buffer, channel, channelData, bufferSize, delayBufferSize);
-
-            // Reading from delayBuffer in the past and adding to bufferWet
-            readFromBuffer(bufferWet, delayBuffer, channel, bufferSize, delayBufferSize);
-
-            // Feeding combined bufferWet + delayBuffer to delayBuffer.
-            fillBufferAdd(buffer, channel, channelDataWet, bufferSize, delayBufferSize);
-
-            // applying gain to the buffer and using a logorithmic scale for the gain.
-            buffer.applyGain(juce::Decibels::decibelsToGain(gain));
-
-            // Reading from bufferWet
-            copyFromWet(buffer, bufferWet, channel, bufferSize);
         }
     }
-    updateBufferPositions (buffer, delayBuffer);
 }
 
 //==============================================================================
@@ -212,144 +208,9 @@ void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeI
     juce::ignoreUnused (data, sizeInBytes);
 }
 
-float AudioPluginAudioProcessor::getParameterValue(juce::String parameterID)
-{
-    auto atomicFloat =apvts.getRawParameterValue(parameterID);
-    auto floatValue = atomicFloat -> load();
-    return floatValue;
-}
-
-
-// This is where the circular buffer is made.
-// The circular buffer is a stored memory block that also contains the incoming audio
-void AudioPluginAudioProcessor::fillBuffer(juce::AudioBuffer<float>& buffer, int channel, float* channelData, int bufferSize, int delayBufferSize)
-{
-    // Check to see if main buffer copies to delay buffer without needing to wrap
-    if (delayBufferSize > bufferSize + writePosition)
-    {
-        // Copy main buffer contents to delay buffer
-        delayBuffer.copyFrom(channel, writePosition, channelData, bufferSize);
-    }
-        // if no
-    else
-    {
-        // Determine how much space is left at the end of the delay buffer
-        auto numSamplesToEnd = delayBufferSize - writePosition;
-
-        // Copy that amount of contents to the end...
-        delayBuffer.copyFrom(channel, writePosition, channelData, numSamplesToEnd);
-
-        // Calculate how much contents is remaining to copy
-        auto numSamplesAtStart = bufferSize - numSamplesToEnd;
-
-        // Copy remaining amount to beginning of delay buffer. Need to state in index that we are reading from numSamplesToEnd.
-        delayBuffer.copyFrom(channel, 0, buffer.getWritePointer(channel, numSamplesToEnd), numSamplesAtStart);
-    }
-}
-
-// This is where the circular buffer is made.
-// The circular buffer is a stored memory block that also contains the incoming audio
-void AudioPluginAudioProcessor::fillBufferAdd(juce::AudioBuffer<float>& buffer, int channel, float* channelData, int bufferSize, int delayBufferSize)
-{
-    // Check to see if main buffer copies to delay buffer without needing to wrap
-    if (delayBufferSize > bufferSize + writePosition)
-    {
-        // Copy main buffer contents to delay buffer
-        delayBuffer.addFrom(channel, writePosition, channelData, bufferSize);
-    }
-        // if no
-    else
-    {
-        // Determine how much space is left at the end of the delay buffer
-        auto numSamplesToEnd = delayBufferSize - writePosition;
-
-        // Copy that amount of contents to the end...
-        delayBuffer.addFrom(channel, writePosition, channelData, numSamplesToEnd);
-
-        // Calculate how much contents is remaining to copy
-        auto numSamplesAtStart = bufferSize - numSamplesToEnd;
-
-        // Copy remaining amount to beginning of delay buffer. Need to state in index that we are reading from numSamplesToEnd.
-        delayBuffer.addFrom(channel, 0, buffer.getWritePointer(channel, numSamplesToEnd), numSamplesAtStart);
-    }
-}
-
-void AudioPluginAudioProcessor::readFromBuffer(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, int channel, int bufferSize, int delayBufferSize)
-{
-    auto l = getParameterValue("length");
-    length.setTargetValue(l);
-    auto lengthValue = length.getNextValue();
-    auto feedback = getParameterValue("feedback");
-
-    // delayMs
-    auto readPosition = (writePosition - getSampleRate() * pow(10, -3) * lengthValue);
-
-    // when readposition is less than 0 it sets to the correct point near the end of the buffer.
-    if (readPosition < 0)
-    {
-        readPosition += delayBufferSize;
-    }
-    // feedback
-    auto g = feedback;
-
-    //If readposition does not need to wrap around
-    if (readPosition + bufferSize < delayBufferSize)
-    {
-        buffer.addFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), bufferSize, g, g);
-    }
-
-    else
-    {
-        // adding samples at the end
-        auto numSamplesToEnd = delayBufferSize - readPosition;
-        buffer.addFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), numSamplesToEnd, g, g);
-
-        // adding samples to the beginning
-        auto numSamplesAtStart = bufferSize - numSamplesToEnd;
-        buffer.addFromWithRamp(channel, numSamplesToEnd, delayBuffer.getReadPointer(channel, 0), numSamplesAtStart, g, g);
-    }
-}
-
-
-// This is used to replace buffer with bufferWet
-void AudioPluginAudioProcessor::copyFromWet(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, int channel, int bufferSize)
-{
-    //i made this 0 because i presume buffer and bufferWet will always be in sync because they got the same size
-    buffer.copyFrom(channel, 0, bufferWet.getReadPointer(channel), bufferSize);
-}
-
-void AudioPluginAudioProcessor::updateBufferPositions(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer)
-{
-    auto bufferSize = buffer.getNumSamples();
-    auto delayBufferSize = delayBuffer.getNumSamples();
-
-    // Adds the writePosition + 1 buffer size.
-    // This is where the writePosition increments.
-    writePosition += bufferSize;
-
-    // Allows it to wrap once the writePosition is about to become greater than the delayBufferSize.
-    writePosition %= delayBufferSize;
-}
-
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new AudioPluginAudioProcessor();
-}
-
-// Implementing function that makes the parameters.
-juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::createParameters()
-{
-    // Storing parameters as a vector
-    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
-
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("gain","Gain", -96.0f, 48.0f, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("feedback", "Delay Feedback", 0.0f, 1.0f, 0.35f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("mix","Dry / Wet", 0.01f, 1.0f, 0.5f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("length","Delay Time", 20.0f, 2000.0f, 500.0f));
-    params.push_back(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"phase", 1}, "Phase", 0));
-    params.push_back(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"toggle", 1}, "On/Off", 1));
-
-    return{ params.begin(), params.end() };
 }

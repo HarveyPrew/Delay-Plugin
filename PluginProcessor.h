@@ -4,7 +4,7 @@
 #include <juce_dsp/juce_dsp.h>
 
 //==============================================================================
-class AudioPluginAudioProcessor  : public juce::AudioProcessor
+class AudioPluginAudioProcessor  : public juce::AudioProcessor, public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     //==============================================================================
@@ -44,33 +44,15 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     //An object of APVTS is made to store the parameters of the plugin
-    juce::AudioProcessorValueTreeState apvts;
+    juce::AudioProcessorValueTreeState treeState;
 
 private:
+    static constexpr auto effectDelaySamples = 192000;
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayModule { effectDelaySamples };
+    std::array<float, 2> lastDelayOutput;
+    std::array<float, 2> delayValue { {} };
 
-    // Defining function that makes parameters.
-    juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
-    float getParameterValue (juce::String parameterID);
-    //==============================================================================
-    // Declare and initialize an int variable that will be used to hold the position of the buffer.
-    int delayBufferPos = 0;
-    int time;
-
-    // Declare an object of class "Audio Buffer", that can store Audio Data.
-    // Float parameter specifies that the type of stored data will be floating-point numbers.
-    juce::AudioBuffer<float> delayBuffer;
-    juce::AudioBuffer<float> bufferWet;
-
-    // The writePosition is the point along the channel data we are. Each sample the writer position goes through gets
-    // temporarily placed in the circular buffer
-    int writePosition { 0 };
-
-    void fillBuffer(juce::AudioBuffer<float>& buffer, int channel, float* channelData, int bufferSize, int delayBufferSize);
-    void fillBufferAdd(juce::AudioBuffer<float>& buffer, int channel, float* channelData, int bufferSize, int delayBufferSize);
-    void readFromBuffer(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, int channel, int bufferSize, int delayBufferSize);
-    void copyFromWet(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, int channel, int bufferSize);
-    void updateBufferPositions(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer);
-    juce::LinearSmoothedValue<float> length { 0.0f };
-
+    juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+    void parameterChanged (const juce::String& parameterID, float newValue) override;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };
