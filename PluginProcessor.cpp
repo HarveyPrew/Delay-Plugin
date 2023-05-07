@@ -92,6 +92,7 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int /*samplesP
 
 
     delayBuffer.setSize(getTotalNumOutputChannels(), (int) delayBufferSize);
+    bufferWet.setSize(getTotalNumOutputChannels(), (int) 512);
 
     length.reset (sampleRate, 0.001);
 }
@@ -143,6 +144,9 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         buffer.clear (i, 0, buffer.getNumSamples());
 
     auto bufferSize = buffer.getNumSamples();
+
+    // Popped this here to see if the bufferWet
+    auto bufferSizeWet = bufferWet.getNumSamples();
     auto delayBufferSize = delayBuffer.getNumSamples();
 
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
@@ -159,26 +163,26 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             // returns a pointer to the start of the memory block that holds audio samples for the channel.
             auto* channelData = buffer.getWritePointer(channel);
 
-            // Function used to feed into the buffer
+            // channelData for the wet buffer, this is used to fill back the delaybuffer
+            auto* channelDataWet = bufferWet.getWritePointer(channel);
+
+            // Function used to feed main buffer into delayBuffer
             fillBuffer(buffer, channel, channelData, bufferSize, delayBufferSize);
-            //buffer.applyGain(mix);
 
-            // This is overwriting the dry signal.
-            // TODO Make this input not the main but another buffer
-            readFromBuffer(buffer, delayBuffer, channel, bufferSize, delayBufferSize);
+            // Reading from delayBuffer in the past and adding to bufferWet
+            readFromBuffer(bufferWet, delayBuffer, channel, bufferSize, delayBufferSize);
 
+            // Feeding combined bufferWet + delayBuffer to delayBuffer.
+            fillBufferAdd(buffer, channel, channelDataWet, bufferSize, delayBufferSize);
 
-            fillBufferAdd(buffer, channel, channelData, bufferSize, delayBufferSize);
-
-            // TODO Change this to add the two buffer
+            // applying gain to the buffer and using a logorithmic scale for the gain.
             buffer.applyGain(juce::Decibels::decibelsToGain(gain));
 
+            // Reading from bufferWet
+            copyFromWet(buffer, bufferWet, channel, bufferSize);
         }
     }
-
     updateBufferPositions (buffer, delayBuffer);
-
-
 }
 
 //==============================================================================
@@ -304,6 +308,14 @@ void AudioPluginAudioProcessor::readFromBuffer(juce::AudioBuffer<float>& buffer,
         auto numSamplesAtStart = bufferSize - numSamplesToEnd;
         buffer.addFromWithRamp(channel, numSamplesToEnd, delayBuffer.getReadPointer(channel, 0), numSamplesAtStart, g, g);
     }
+}
+
+
+// This is used to replace buffer with bufferWet
+void AudioPluginAudioProcessor::copyFromWet(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, int channel, int bufferSize)
+{
+    //i made this 0 because i presume buffer and bufferWet will always be in sync because they got the same size
+    buffer.copyFrom(channel, 0, bufferWet.getReadPointer(channel, 0), bufferSize);
 }
 
 void AudioPluginAudioProcessor::updateBufferPositions(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer)
