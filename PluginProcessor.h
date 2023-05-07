@@ -58,9 +58,13 @@ private:
     // Declare an object of class "Audio Buffer", that can store Audio Data.
     // Float parameter specifies that the type of stored data will be floating-point numbers.
     juce::AudioBuffer<float> delayBuffer;
+
+    // The writePosition is the point along the channel data we are. Each sample the writer position goes through gets
+    // temporarily placed in the circular buffer
     int writePosition { 0 };
 
     void fillBuffer(juce::AudioBuffer<float>& buffer, int channel, float* channelData, int bufferSize, int delayBufferSize);
+    void fillBufferAdd(juce::AudioBuffer<float>& buffer, int channel, float* channelData, int bufferSize, int delayBufferSize);
     void readFromBuffer(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer, int channel, int bufferSize, int delayBufferSize);
     void updateBufferPositions(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer);
     juce::LinearSmoothedValue<float> length { 0.0f };
