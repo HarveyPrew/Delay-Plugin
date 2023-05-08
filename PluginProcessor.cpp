@@ -34,11 +34,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     auto mix = std::make_unique<juce::AudioParameterFloat>("mix", "Mix", 0.0f, 100.0f, 50.0f);
     auto feedback = std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 100.0f, 50.0f);
     auto gain = std::make_unique<juce::AudioParameterFloat>("gain", "Gain", 0.0f, 1.0f, 0.5f);
+    auto toggle = std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"toggle", 1}, "On/Off", 1);
 
     params.push_back(std::move(pDelay));
     params.push_back(std::move(mix));
     params.push_back(std::move(feedback));
     params.push_back(std::move(gain));
+    params.push_back(std::move(toggle));
 
     return { params.begin(), params.end() };
 }
@@ -175,34 +177,39 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto mix = treeState.getRawParameterValue("mix")->load()*0.01;
     auto feedback = treeState.getRawParameterValue("feedback")->load()*0.01;
     auto gain = treeState.getRawParameterValue("gain")->load();
+    auto toggle = treeState.getRawParameterValue("toggle")->load();
 
     // Resetting the delay time
     delayModule.setDelay(treeState.getRawParameterValue("delay")->load() / 1000.0f * getSampleRate());
 
     for (size_t channel = 0; channel < numChannels; ++channel)
     {
-
-        auto* samplesIn = input.getChannelPointer (channel);
-        auto* samplesOut = output.getChannelPointer (channel);
-
-
-        for (size_t sample = 0; sample < input.getNumSamples(); ++sample)
+        if (toggle == 0)
         {
-            // extracting output of delay sample
-            // the popSample task takes whats in the delayModule and puts it in delayOutput
-            auto delayOutput = delayModule.popSample((int)channel);
+            continue;
+        }
+        else
+        {
+            auto* samplesIn = input.getChannelPointer (channel);
+            auto* samplesOut = output.getChannelPointer (channel);
 
-            // Input Sample
-            // we are taking in the input samples + feedback* delayed output
-            // So we take in the input + feedback*whatever is in the delay output
-            auto input = samplesIn[sample] + feedback*delayOutput;
+            for (size_t sample = 0; sample < input.getNumSamples(); ++sample)
+            {
+                // extracting output of delay sample
+                // the popSample task takes whats in the delayModule and puts it in delayOutput
+                auto delayOutput = delayModule.popSample((int)channel);
 
-            // pusing input sample + delayOutput into delay module
-            delayModule.pushSample((int)channel, input);
+                // Input Sample
+                // we are taking in the input samples + feedback* delayed output
+                // So we take in the input + feedback*whatever is in the delay output
+                auto input = samplesIn[sample] + feedback*delayOutput;
 
-            // Combining both input and delayed sample
-            samplesOut[sample] = (input*(1 - mix) + (delayOutput)*mix) * gain;
+                // pusing input sample + delayOutput into delay module
+                delayModule.pushSample((int)channel, input);
 
+                // Combining both input and delayed sample
+                samplesOut[sample] = (input*(1 - mix) + (delayOutput)*mix) * gain;
+            }
         }
     }
 }
