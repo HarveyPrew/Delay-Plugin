@@ -34,7 +34,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     // Making a vector called parameters.
     std::vector <std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    auto pDelay = floatParameterAsPointer("delay", "Delay", 0.01f, 1000.0f, 500.0f);
+    auto pDelay = floatParameterAsPointer("delay", "Delay Length", 0.01f, 1000.0f, 500.0f);
     auto mix = floatParameterAsPointer("mix", "Mix", 0.0f, 100.0f, 50.0f);
     auto feedback = floatParameterAsPointer("feedback", "Feedback", 0.0f, 100.0f, 50.0f);
     auto gain = floatParameterAsPointer("gain", "Gain", 0.0f, 1.0f, 0.5f);
@@ -45,16 +45,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     addFloatParameterPointerToVector(params, mix);
     addFloatParameterPointerToVector(params, feedback);
     addFloatParameterPointerToVector(params, gain);
+    addBoolParameterPointerToVector(params, toggle);
+    addBoolParameterPointerToVector(params, phase);
 
-    params.push_back(std::move(toggle));
-    params.push_back(std::move(phase));
-
+    // Returning this list of parameters
     return { params.begin(), params.end() };
 }
 
 // Implementing parameterChanged.
 void AudioPluginAudioProcessor::parameterChanged(const juce::String &parameterID, float newValue)
 {
+    // Everytime the Delay Length parameter is changed the new delay value is set.
     delayModule.setDelay(newValue / 1000.0f * getSampleRate());
 }
 
@@ -289,8 +290,15 @@ std::unique_ptr<juce::AudioParameterBool> AudioPluginAudioProcessor::boolParamet
 
 }
 
-void AudioPluginAudioProcessor::addFloatParameterPointerToVector(std::vector <std::unique_ptr<juce::RangedAudioParameter>>& params,
-                                                                 std::unique_ptr<juce::AudioParameterFloat>& parameter) {
+void AudioPluginAudioProcessor::addFloatParameterPointerToVector(
+        std::vector <std::unique_ptr<juce::RangedAudioParameter>>& params,
+        std::unique_ptr<juce::AudioParameterFloat>& parameter) {
+    params.push_back(std::move(parameter));
+}
+
+void AudioPluginAudioProcessor::addBoolParameterPointerToVector(
+        std::vector<std::unique_ptr<juce::RangedAudioParameter>> &params,
+        std::unique_ptr<juce::AudioParameterBool> &parameter) {
     params.push_back(std::move(parameter));
 }
 

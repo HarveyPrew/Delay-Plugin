@@ -73,6 +73,10 @@ private:
     //Function is called to add parameter into treeState vector.
     std::unique_ptr<juce::AudioParameterBool> boolParameterAsPointer(juce::String id, juce::String name, float defaultValue);
 
-    void addFloatParameterPointerToVector(std::vector <std::unique_ptr<juce::RangedAudioParameter>>& params, std::unique_ptr<juce::AudioParameterFloat>& parameter);
+    void addFloatParameterPointerToVector(std::vector <std::unique_ptr<juce::RangedAudioParameter>>& params,
+                                          std::unique_ptr<juce::AudioParameterFloat>& parameter);
+
+    void addBoolParameterPointerToVector(std::vector <std::unique_ptr<juce::RangedAudioParameter>>& params,
+                                          std::unique_ptr<juce::AudioParameterBool>& parameter);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };
