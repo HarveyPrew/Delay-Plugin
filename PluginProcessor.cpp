@@ -10,7 +10,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
                                   .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
 #endif
-), treeState(*this, nullptr, "PARAMETERS", createParameterLayout())
+), treeState(*this, nullptr, "PARAMETERS", createParameterLayout()) // Constructing tree state.
 {
     treeState.addParameterListener("delay", this);
     treeState.addParameterListener("mix", this);
@@ -28,16 +28,18 @@ AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
     treeState.removeParameterListener("phase", this);
 }
 
+// Implementing createParmeterLayout.
 juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::createParameterLayout()
 {
+    // Making a vector called parameters.
     std::vector <std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    auto pDelay = std::make_unique<juce::AudioParameterFloat>("delay", "Delay", 0.01f, 1000.0f, 500.0f);
-    auto mix = std::make_unique<juce::AudioParameterFloat>("mix", "Mix", 0.0f, 100.0f, 50.0f);
-    auto feedback = std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 100.0f, 50.0f);
-    auto gain = std::make_unique<juce::AudioParameterFloat>("gain", "Gain", 0.0f, 1.0f, 0.5f);
-    auto toggle = std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"toggle", 1}, "Toggle", 1);
-    auto phase = std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"phase", 1}, "Phase", 0);
+    auto pDelay = floatParameterAsPointer("delay", "Delay", 0.01f, 1000.0f, 500.0f);
+    auto mix = floatParameterAsPointer("mix", "Mix", 0.0f, 100.0f, 50.0f);
+    auto feedback = floatParameterAsPointer("feedback", "Feedback", 0.0f, 100.0f, 50.0f);
+    auto gain = floatParameterAsPointer("gain", "Gain", 0.0f, 1.0f, 0.5f);
+    auto toggle = boolParameterAsPointer("toggle", "Toggle", 1);
+    auto phase = boolParameterAsPointer("phase", "Phase", 0);
 
     params.push_back(std::move(pDelay));
     params.push_back(std::move(mix));
@@ -49,6 +51,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     return { params.begin(), params.end() };
 }
 
+// Implementing parameterChanged.
 void AudioPluginAudioProcessor::parameterChanged(const juce::String &parameterID, float newValue)
 {
     delayModule.setDelay(newValue / 1000.0f * getSampleRate());
@@ -119,6 +122,8 @@ void AudioPluginAudioProcessor::changeProgramName (int index, const juce::String
     juce::ignoreUnused (index, newName);
 }
 
+
+// The prepareToPlay is called to set parameters when application opens or sample rate is changed
 //==============================================================================
 void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
@@ -199,6 +204,7 @@ bool AudioPluginAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* AudioPluginAudioProcessor::createEditor()
 {
+    // Using the genericAudioProcessorEditor to generatre gui.
     return new juce::GenericAudioProcessorEditor (*this);
 }
 
@@ -250,7 +256,7 @@ void AudioPluginAudioProcessor::addingSamplesToOutputAndDelayModule(size_t chann
     //made an input for delay which is the combination of the input samples and feedback * delayoutput
     auto inputForDelay = samplesIn[sample] + feedback*delayOutput;
 
-    // pusing input sample + delayOutput into delay module
+    // pushing input sample + delayOutput into delay module
     delayModule.pushSample((int)channel, inputForDelay);
 
     auto phase = treeState.getRawParameterValue("phase")->load();
@@ -268,6 +274,17 @@ void AudioPluginAudioProcessor::addingSamplesToOutputAndDelayModule(size_t chann
         samplesOut[sample] = (input*(1 - mix) + delayOutput*mix) * gain * -1;
     }
 
+}
+
+// Implementing floatParameterAsPointer
+std::unique_ptr<juce::AudioParameterFloat> AudioPluginAudioProcessor::floatParameterAsPointer(juce::String id, juce::String name, float minValue, float maxValue, float defaultValue) {
+    return std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{id, 1}, name, minValue, maxValue, defaultValue);
+
+}
+
+// Implementing floatParameterAsPointer
+std::unique_ptr<juce::AudioParameterBool> AudioPluginAudioProcessor::boolParameterAsPointer(juce::String id, juce::String name, float defaultValue) {
+    return std::make_unique<juce::AudioParameterBool>(juce::ParameterID{id, 1}, name, defaultValue);
 
 }
 

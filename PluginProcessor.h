@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 
+// Inherting from the listener is done here.
 //==============================================================================
 class AudioPluginAudioProcessor  : public juce::AudioProcessor, public juce::AudioProcessorValueTreeState::Listener
 {
@@ -47,14 +48,29 @@ public:
     juce::AudioProcessorValueTreeState treeState;
 
 private:
+
+    // 192000 Is the highest possible sample rate.
     static constexpr auto effectDelaySamples = 192000;
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayModule { effectDelaySamples };
     std::array<float, 2> lastDelayOutput;
     std::array<float, 2> delayValue { {} };
     void delayProcess(juce::AudioBuffer<float>& buffer,size_t channel, int numChannels);
+
+    // Function is used to create the parameter layout, parameter attributes are stored here.
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
+    // Function is called when parameter value is changed.
     void parameterChanged (const juce::String& parameterID, float newValue) override;
+
     void addingSamplesToOutputAndDelayModule(size_t channel, const float* samplesIn,float* samplesOut,
                                              size_t sample);
+
+    //Function is called to add parameter into treeState vector.
+    std::unique_ptr<juce::AudioParameterFloat> floatParameterAsPointer(juce::String id, juce::String name,
+                                                                       float minValue, float maxValue,
+                                                                       float defaultValue);
+
+    //Function is called to add parameter into treeState vector.
+    std::unique_ptr<juce::AudioParameterBool> boolParameterAsPointer(juce::String id, juce::String name, float defaultValue);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };
