@@ -12,20 +12,10 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
 ), treeState(*this, nullptr, "PARAMETERS", createParameterLayout()) // Constructing tree state.
 {
-    treeState.addParameterListener("delay", this);
-    treeState.addParameterListener("mix", this);
-    treeState.addParameterListener("feedback", this);
-    treeState.addParameterListener("gain", this);
-    treeState.addParameterListener("phase", this);
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
 {
-    treeState.removeParameterListener("delay", this);
-    treeState.removeParameterListener("mix", this);
-    treeState.removeParameterListener("feedback", this);
-    treeState.removeParameterListener("gain", this);
-    treeState.removeParameterListener("phase", this);
 }
 
 // Implementing createParmeterLayout.
@@ -50,13 +40,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
 
     // Returning this list of parameters
     return { params.begin(), params.end() };
-}
-
-// Implementing parameterChanged.
-void AudioPluginAudioProcessor::parameterChanged(const juce::String &parameterID, float newValue)
-{
-    // Everytime the Delay Length parameter is changed the new delay value is set.
-    delayModule.setDelay(newValue / 1000.0f * getSampleRate());
 }
 
 //==============================================================================

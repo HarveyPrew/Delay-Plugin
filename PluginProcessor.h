@@ -5,7 +5,7 @@
 
 // Inherting from the listener is done here.
 //==============================================================================
-class AudioPluginAudioProcessor  : public juce::AudioProcessor, public juce::AudioProcessorValueTreeState::Listener
+class AudioPluginAudioProcessor  : public juce::AudioProcessor
 {
 public:
     //==============================================================================
@@ -59,8 +59,6 @@ private:
     // Function is used to create the parameter layout, parameter attributes are stored here.
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-    // Function is called when parameter value is changed.
-    void parameterChanged (const juce::String& parameterID, float newValue) override;
 
     void addingSamplesToOutputAndDelayModule(size_t channel, const float* samplesIn,float* samplesOut,
                                              size_t sample);
