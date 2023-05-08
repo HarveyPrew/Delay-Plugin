@@ -16,6 +16,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     treeState.addParameterListener("mix", this);
     treeState.addParameterListener("feedback", this);
     treeState.addParameterListener("gain", this);
+    treeState.addParameterListener("phase", this);
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
@@ -24,6 +25,7 @@ AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
     treeState.removeParameterListener("mix", this);
     treeState.removeParameterListener("feedback", this);
     treeState.removeParameterListener("gain", this);
+    treeState.removeParameterListener("phase", this);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::createParameterLayout()
@@ -34,13 +36,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     auto mix = std::make_unique<juce::AudioParameterFloat>("mix", "Mix", 0.0f, 100.0f, 50.0f);
     auto feedback = std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 100.0f, 50.0f);
     auto gain = std::make_unique<juce::AudioParameterFloat>("gain", "Gain", 0.0f, 1.0f, 0.5f);
-    auto toggle = std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"toggle", 1}, "On/Off", 1);
+    auto toggle = std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"toggle", 1}, "Toggle", 1);
+    auto phase = std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"phase", 1}, "Phase", 1);
 
     params.push_back(std::move(pDelay));
     params.push_back(std::move(mix));
     params.push_back(std::move(feedback));
     params.push_back(std::move(gain));
     params.push_back(std::move(toggle));
+    params.push_back(std::move(phase));
 
     return { params.begin(), params.end() };
 }
@@ -169,7 +173,6 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     const auto numChannels = juce::jmax (totalNumInputChannels, totalNumOutputChannels);
 
-
     auto mix = treeState.getRawParameterValue("mix")->load()*0.01;
     auto feedback = treeState.getRawParameterValue("feedback")->load()*0.01;
     auto gain = treeState.getRawParameterValue("gain")->load();
@@ -251,8 +254,19 @@ void AudioPluginAudioProcessor::addingSamplesToOutputAndDelayModule(size_t chann
     // pusing input sample + delayOutput into delay module
     delayModule.pushSample((int)channel, inputForDelay);
 
-    // Combining both input and delayed sample
-    samplesOut[sample] = (input*(1 - mix) + delayOutput*mix) * gain;
+    auto phase = treeState.getRawParameterValue("phase")->load();
+
+    if (phase == 0)
+    {
+        // Combining both input and delayed sample
+        samplesOut[sample] = (input*(1 - mix) + delayOutput*mix) * gain;
+    }
+    else
+    {
+        // Adding phase
+        samplesOut[sample] = (input*(1 - mix) + delayOutput*mix) * gain * -1;
+    }
+
 
 }
 
