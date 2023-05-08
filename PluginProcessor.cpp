@@ -163,7 +163,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     const auto& input = context.getInputBlock();
     const auto& output = context.getOutputBlock();
     auto mix = treeState.getRawParameterValue("mix")->load()*0.01;
-
+    auto feedback = 0;
 
     for (size_t channel = 0; channel < numChannels; ++channel)
     {
@@ -171,15 +171,24 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         auto* samplesIn = input.getChannelPointer (channel);
         auto* samplesOut = output.getChannelPointer (channel);
 
+
         for (size_t sample = 0; sample < input.getNumSamples(); ++sample)
         {
-            auto input = samplesIn[sample];
-
-            delayModule.pushSample((int)channel, input);
-
+            //extracting output of delay sample
             auto delayOutput = delayModule.popSample((int)channel);
+            // Input Sample
+            auto input = samplesIn[sample];
+            auto output = 0.8*delayOutput;
+
+            // pusing input sample into delay module
+            delayModule.pushSample((int)channel, input + output);
+
+
+
+            // Combining both input and delayed sample
             samplesOut[sample] = input*(1 - mix) + delayOutput*mix;
-            //samplesOut[sample] = input * treeState.getRawParameterValue("mix")->load()*0.01) + delayModule.popSample((int)channel);
+
+
 
         }
     }
