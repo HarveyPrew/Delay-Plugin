@@ -25,10 +25,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     std::vector <std::unique_ptr<juce::RangedAudioParameter>> params;
 
     auto pDelay = std::make_unique<juce::AudioParameterFloat>("delay", "Delay", 0.01f, 1000.0f, 500.0f);
-    auto mix = std::make_unique<juce::AudioParameterFloat>("mix", "Mix", 0.01f, 100.0f, 50.0f);
+    auto mix = std::make_unique<juce::AudioParameterFloat>("mix", "Mix", 0.0f, 100.0f, 50.0f);
+    auto feedback = std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 100.0f, 50.0f);
 
     params.push_back(std::move(pDelay));
     params.push_back(std::move(mix));
+    params.push_back(std::move(feedback));
 
     return { params.begin(), params.end() };
 }
@@ -163,7 +165,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     const auto& input = context.getInputBlock();
     const auto& output = context.getOutputBlock();
     auto mix = treeState.getRawParameterValue("mix")->load()*0.01;
-    auto feedback = 0;
+    auto feedback = treeState.getRawParameterValue("feedback")->load()*0.01;
 
     for (size_t channel = 0; channel < numChannels; ++channel)
     {
@@ -178,7 +180,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             auto delayOutput = delayModule.popSample((int)channel);
             // Input Sample
             auto input = samplesIn[sample];
-            auto output = 0.8*delayOutput;
+            auto output = feedback*delayOutput;
 
             // pusing input sample into delay module
             delayModule.pushSample((int)channel, input + output);
