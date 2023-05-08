@@ -15,6 +15,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     treeState.addParameterListener("delay", this);
     treeState.addParameterListener("mix", this);
     treeState.addParameterListener("feedback", this);
+    treeState.addParameterListener("gain", this);
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
@@ -22,6 +23,7 @@ AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
     treeState.removeParameterListener("delay", this);
     treeState.removeParameterListener("mix", this);
     treeState.removeParameterListener("feedback", this);
+    treeState.removeParameterListener("gain", this);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::createParameterLayout()
@@ -31,10 +33,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     auto pDelay = std::make_unique<juce::AudioParameterFloat>("delay", "Delay", 0.01f, 1000.0f, 500.0f);
     auto mix = std::make_unique<juce::AudioParameterFloat>("mix", "Mix", 0.0f, 100.0f, 50.0f);
     auto feedback = std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 100.0f, 50.0f);
+    auto gain = std::make_unique<juce::AudioParameterFloat>("gain", "Gain", 0.0f, 1.0f, 0.5f);
 
     params.push_back(std::move(pDelay));
     params.push_back(std::move(mix));
     params.push_back(std::move(feedback));
+    params.push_back(std::move(gain));
 
     return { params.begin(), params.end() };
 }
@@ -170,6 +174,10 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     const auto& output = context.getOutputBlock();
     auto mix = treeState.getRawParameterValue("mix")->load()*0.01;
     auto feedback = treeState.getRawParameterValue("feedback")->load()*0.01;
+    auto gain = treeState.getRawParameterValue("gain")->load();
+
+    // Resetting the delay time
+    delayModule.setDelay(treeState.getRawParameterValue("delay")->load() / 1000.0f * getSampleRate());
 
     for (size_t channel = 0; channel < numChannels; ++channel)
     {
@@ -189,17 +197,11 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             // So we take in the input + feedback*whatever is in the delay output
             auto input = samplesIn[sample] + feedback*delayOutput;
 
-            // Copied from prepareToPlay to see if this keeps the delay time.
-            //Atm when i change either mix or feedback delay module changes.
-            // If i keep calling set delay maybe it wont lol.
-            delayModule.setDelay(treeState.getRawParameterValue("delay")->load() / 1000.0f * getSampleRate());
-
-
             // pusing input sample + delayOutput into delay module
             delayModule.pushSample((int)channel, input);
 
             // Combining both input and delayed sample
-            samplesOut[sample] = input*(1 - mix) + (delayOutput)*mix;
+            samplesOut[sample] = (input*(1 - mix) + (delayOutput)*mix) * gain;
 
         }
     }

@@ -52,6 +52,7 @@ private:
     std::array<float, 2> lastDelayOutput;
     std::array<float, 2> delayValue { {} };
 
+
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void parameterChanged (const juce::String& parameterID, float newValue) override;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
