@@ -235,14 +235,16 @@ void AudioPluginAudioProcessor::delayProcess(juce::AudioBuffer<float>& buffer,si
         auto delayOutput = delayModule.popSample((int)channel);
 
         // Input Sample
-        // we are taking in the input samples + feedback* delayed output
-        auto input = samplesIn[sample] + feedback*delayOutput;
+        // we are taking in the input samples
+        auto input = samplesIn[sample];
+
+        auto inputForDelay = samplesIn[sample] + feedback*delayOutput;
 
         // pusing input sample + delayOutput into delay module
-        delayModule.pushSample((int)channel, input);
+        delayModule.pushSample((int)channel, inputForDelay);
 
         // Combining both input and delayed sample
-        samplesOut[sample] = (input*(1 - mix) + (delayOutput)*mix) * gain;
+        samplesOut[sample] = (input*(1 - mix) + delayOutput*mix) * gain;
     }
 }
 
