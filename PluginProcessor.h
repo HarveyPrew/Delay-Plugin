@@ -51,8 +51,8 @@ private:
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayModule { effectDelaySamples };
     std::array<float, 2> lastDelayOutput;
     std::array<float, 2> delayValue { {} };
-
-
+    void delayProcess(juce::AudioBuffer<float>& buffer,size_t channel, int numChannels, float feedback,
+                      float mix, float gain);
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void parameterChanged (const juce::String& parameterID, float newValue) override;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)

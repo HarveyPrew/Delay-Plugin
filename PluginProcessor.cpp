@@ -169,11 +169,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     const auto numChannels = juce::jmax (totalNumInputChannels, totalNumOutputChannels);
 
-    auto audioBlock = juce::dsp::AudioBlock<float> (buffer).getSubsetChannelBlock (0, (size_t) numChannels);
-    auto context = juce::dsp::ProcessContextReplacing<float>(audioBlock);
 
-    const auto& input = context.getInputBlock();
-    const auto& output = context.getOutputBlock();
     auto mix = treeState.getRawParameterValue("mix")->load()*0.01;
     auto feedback = treeState.getRawParameterValue("feedback")->load()*0.01;
     auto gain = treeState.getRawParameterValue("gain")->load();
@@ -190,26 +186,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         }
         else
         {
-            auto* samplesIn = input.getChannelPointer (channel);
-            auto* samplesOut = output.getChannelPointer (channel);
-
-            for (size_t sample = 0; sample < input.getNumSamples(); ++sample)
-            {
-                // extracting output of delay sample
-                // the popSample task takes whats in the delayModule and puts it in delayOutput
-                auto delayOutput = delayModule.popSample((int)channel);
-
-                // Input Sample
-                // we are taking in the input samples + feedback* delayed output
-                // So we take in the input + feedback*whatever is in the delay output
-                auto input = samplesIn[sample] + feedback*delayOutput;
-
-                // pusing input sample + delayOutput into delay module
-                delayModule.pushSample((int)channel, input);
-
-                // Combining both input and delayed sample
-                samplesOut[sample] = (input*(1 - mix) + (delayOutput)*mix) * gain;
-            }
+            delayProcess(buffer, channel, numChannels, feedback, mix, gain);
         }
     }
 }
@@ -239,6 +216,34 @@ void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeI
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
     juce::ignoreUnused (data, sizeInBytes);
+}
+
+void AudioPluginAudioProcessor::delayProcess(juce::AudioBuffer<float>& buffer,size_t channel, int numChannels, float feedback,
+                                             float mix, float gain)
+{
+    auto audioBlock = juce::dsp::AudioBlock<float> (buffer).getSubsetChannelBlock (0, (size_t) numChannels);
+    auto context = juce::dsp::ProcessContextReplacing<float>(audioBlock);
+    const auto& input = context.getInputBlock();
+    const auto& output = context.getOutputBlock();
+    auto* samplesIn = input.getChannelPointer (channel);
+    auto* samplesOut = output.getChannelPointer (channel);
+
+    for (size_t sample = 0; sample < input.getNumSamples(); ++sample)
+    {
+        // extracting output of delay sample
+        // the popSample task takes whats in the delayModule and puts it in delayOutput
+        auto delayOutput = delayModule.popSample((int)channel);
+
+        // Input Sample
+        // we are taking in the input samples + feedback* delayed output
+        auto input = samplesIn[sample] + feedback*delayOutput;
+
+        // pusing input sample + delayOutput into delay module
+        delayModule.pushSample((int)channel, input);
+
+        // Combining both input and delayed sample
+        samplesOut[sample] = (input*(1 - mix) + (delayOutput)*mix) * gain;
+    }
 }
 
 //==============================================================================
