@@ -37,7 +37,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     auto feedback = std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 100.0f, 50.0f);
     auto gain = std::make_unique<juce::AudioParameterFloat>("gain", "Gain", 0.0f, 1.0f, 0.5f);
     auto toggle = std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"toggle", 1}, "Toggle", 1);
-    auto phase = std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"phase", 1}, "Phase", 1);
+    auto phase = std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"phase", 1}, "Phase", 0);
 
     params.push_back(std::move(pDelay));
     params.push_back(std::move(mix));
@@ -173,13 +173,10 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     const auto numChannels = juce::jmax (totalNumInputChannels, totalNumOutputChannels);
 
-    auto mix = treeState.getRawParameterValue("mix")->load()*0.01;
-    auto feedback = treeState.getRawParameterValue("feedback")->load()*0.01;
-    auto gain = treeState.getRawParameterValue("gain")->load();
+
     auto toggle = treeState.getRawParameterValue("toggle")->load();
 
-    // Resetting the delay time
-    delayModule.setDelay(treeState.getRawParameterValue("delay")->load() / 1000.0f * getSampleRate());
+
 
     for (size_t channel = 0; channel < numChannels; ++channel)
     {
@@ -189,7 +186,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         }
         else
         {
-            delayProcess(buffer, channel, numChannels, feedback, mix, gain);
+            delayProcess(buffer, channel, numChannels);
         }
     }
 }
@@ -221,9 +218,11 @@ void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeI
     juce::ignoreUnused (data, sizeInBytes);
 }
 
-void AudioPluginAudioProcessor::delayProcess(juce::AudioBuffer<float>& buffer,size_t channel, int numChannels, float feedback,
-                                             float mix, float gain)
+void AudioPluginAudioProcessor::delayProcess(juce::AudioBuffer<float>& buffer,size_t channel, int numChannels)
 {
+    // Resetting the delay time
+    delayModule.setDelay(treeState.getRawParameterValue("delay")->load() / 1000.0f * getSampleRate());
+
     auto audioBlock = juce::dsp::AudioBlock<float> (buffer).getSubsetChannelBlock (0, (size_t) numChannels);
     auto context = juce::dsp::ProcessContextReplacing<float>(audioBlock);
     auto& input = context.getInputBlock();
@@ -233,13 +232,12 @@ void AudioPluginAudioProcessor::delayProcess(juce::AudioBuffer<float>& buffer,si
 
     for (size_t sample = 0; sample < input.getNumSamples(); ++sample)
     {
-        addingSamplesToOutputAndDelayModule(channel, samplesIn, samplesOut, sample, feedback, mix, gain);
+        addingSamplesToOutputAndDelayModule(channel, samplesIn, samplesOut, sample);
     }
 }
 
 void AudioPluginAudioProcessor::addingSamplesToOutputAndDelayModule(size_t channel, const float* samplesIn,
-                                                                    float* samplesOut, size_t sample,
-                                                                    float feedback, float mix, float gain) {
+                                                                    float* samplesOut, size_t sample) {
     // extracting output of delay sample
     // the popSample task takes what's in the delayModule and puts it in delayOutput
     auto delayOutput = delayModule.popSample((int)channel);
@@ -248,6 +246,7 @@ void AudioPluginAudioProcessor::addingSamplesToOutputAndDelayModule(size_t chann
     // we are taking in the input samples
     auto input = samplesIn[sample];
 
+    auto feedback = treeState.getRawParameterValue("feedback")->load()*0.01;
     //made an input for delay which is the combination of the input samples and feedback * delayoutput
     auto inputForDelay = samplesIn[sample] + feedback*delayOutput;
 
@@ -255,6 +254,8 @@ void AudioPluginAudioProcessor::addingSamplesToOutputAndDelayModule(size_t chann
     delayModule.pushSample((int)channel, inputForDelay);
 
     auto phase = treeState.getRawParameterValue("phase")->load();
+    auto mix = treeState.getRawParameterValue("mix")->load()*0.01;
+    auto gain = treeState.getRawParameterValue("gain")->load();
 
     if (phase == 0)
     {
