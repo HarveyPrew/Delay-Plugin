@@ -13,11 +13,15 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 ), treeState(*this, nullptr, "PARAMETERS", createParameterLayout())
 {
     treeState.addParameterListener("delay", this);
+    treeState.addParameterListener("mix", this);
+    treeState.addParameterListener("feedback", this);
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
 {
     treeState.removeParameterListener("delay", this);
+    treeState.removeParameterListener("mix", this);
+    treeState.removeParameterListener("feedback", this);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::createParameterLayout()
@@ -176,21 +180,26 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
         for (size_t sample = 0; sample < input.getNumSamples(); ++sample)
         {
-            //extracting output of delay sample
+            // extracting output of delay sample
+            // the popSample task takes whats in the delayModule and puts it in delayOutput
             auto delayOutput = delayModule.popSample((int)channel);
+
             // Input Sample
-            auto input = samplesIn[sample];
-            auto output = feedback*delayOutput;
+            // we are taking in the input samples + feedback* delayed output
+            // So we take in the input + feedback*whatever is in the delay output
+            auto input = samplesIn[sample] + feedback*delayOutput;
 
-            // pusing input sample into delay module
-            delayModule.pushSample((int)channel, input + output);
+            // Copied from prepareToPlay to see if this keeps the delay time.
+            //Atm when i change either mix or feedback delay module changes.
+            // If i keep calling set delay maybe it wont lol.
+            delayModule.setDelay(treeState.getRawParameterValue("delay")->load() / 1000.0f * getSampleRate());
 
 
+            // pusing input sample + delayOutput into delay module
+            delayModule.pushSample((int)channel, input);
 
             // Combining both input and delayed sample
-            samplesOut[sample] = input*(1 - mix) + delayOutput*mix;
-
-
+            samplesOut[sample] = input*(1 - mix) + (delayOutput)*mix;
 
         }
     }
