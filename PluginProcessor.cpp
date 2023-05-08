@@ -41,10 +41,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     auto toggle = boolParameterAsPointer("toggle", "Toggle", 1);
     auto phase = boolParameterAsPointer("phase", "Phase", 0);
 
-    params.push_back(std::move(pDelay));
-    params.push_back(std::move(mix));
-    params.push_back(std::move(feedback));
-    params.push_back(std::move(gain));
+    addFloatParameterPointerToVector(params, pDelay);
+    addFloatParameterPointerToVector(params, mix);
+    addFloatParameterPointerToVector(params, feedback);
+    addFloatParameterPointerToVector(params, gain);
+
     params.push_back(std::move(toggle));
     params.push_back(std::move(phase));
 
@@ -286,6 +287,11 @@ std::unique_ptr<juce::AudioParameterFloat> AudioPluginAudioProcessor::floatParam
 std::unique_ptr<juce::AudioParameterBool> AudioPluginAudioProcessor::boolParameterAsPointer(juce::String id, juce::String name, float defaultValue) {
     return std::make_unique<juce::AudioParameterBool>(juce::ParameterID{id, 1}, name, defaultValue);
 
+}
+
+void AudioPluginAudioProcessor::addFloatParameterPointerToVector(std::vector <std::unique_ptr<juce::RangedAudioParameter>>& params,
+                                                                 std::unique_ptr<juce::AudioParameterFloat>& parameter) {
+    params.push_back(std::move(parameter));
 }
 
 //==============================================================================
