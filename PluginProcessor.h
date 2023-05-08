@@ -55,5 +55,7 @@ private:
                       float mix, float gain);
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void parameterChanged (const juce::String& parameterID, float newValue) override;
+    void addingSamplesToOutputAndDelayModule(size_t channel, const float* samplesIn,float* samplesOut,
+                                             size_t sample,float feedback, float mix, float gain);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };

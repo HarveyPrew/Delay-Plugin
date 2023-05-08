@@ -223,29 +223,37 @@ void AudioPluginAudioProcessor::delayProcess(juce::AudioBuffer<float>& buffer,si
 {
     auto audioBlock = juce::dsp::AudioBlock<float> (buffer).getSubsetChannelBlock (0, (size_t) numChannels);
     auto context = juce::dsp::ProcessContextReplacing<float>(audioBlock);
-    const auto& input = context.getInputBlock();
-    const auto& output = context.getOutputBlock();
+    auto& input = context.getInputBlock();
+    auto& output = context.getOutputBlock();
     auto* samplesIn = input.getChannelPointer (channel);
     auto* samplesOut = output.getChannelPointer (channel);
 
     for (size_t sample = 0; sample < input.getNumSamples(); ++sample)
     {
-        // extracting output of delay sample
-        // the popSample task takes whats in the delayModule and puts it in delayOutput
-        auto delayOutput = delayModule.popSample((int)channel);
-
-        // Input Sample
-        // we are taking in the input samples
-        auto input = samplesIn[sample];
-
-        auto inputForDelay = samplesIn[sample] + feedback*delayOutput;
-
-        // pusing input sample + delayOutput into delay module
-        delayModule.pushSample((int)channel, inputForDelay);
-
-        // Combining both input and delayed sample
-        samplesOut[sample] = (input*(1 - mix) + delayOutput*mix) * gain;
+        addingSamplesToOutputAndDelayModule(channel, samplesIn, samplesOut, sample, feedback, mix, gain);
     }
+}
+
+void AudioPluginAudioProcessor::addingSamplesToOutputAndDelayModule(size_t channel, const float* samplesIn,
+                                                                    float* samplesOut, size_t sample,
+                                                                    float feedback, float mix, float gain) {
+    // extracting output of delay sample
+    // the popSample task takes what's in the delayModule and puts it in delayOutput
+    auto delayOutput = delayModule.popSample((int)channel);
+
+    // Input Sample
+    // we are taking in the input samples
+    auto input = samplesIn[sample];
+
+    //made an input for delay which is the combination of the input samples and feedback * delayoutput
+    auto inputForDelay = samplesIn[sample] + feedback*delayOutput;
+
+    // pusing input sample + delayOutput into delay module
+    delayModule.pushSample((int)channel, inputForDelay);
+
+    // Combining both input and delayed sample
+    samplesOut[sample] = (input*(1 - mix) + delayOutput*mix) * gain;
+
 }
 
 //==============================================================================
