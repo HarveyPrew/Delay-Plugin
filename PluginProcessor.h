@@ -61,6 +61,7 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
 
+    // Function adds the input samples to the delay module and to the output.
     void addingSamplesToOutputAndDelayModule(size_t channel, const float* samplesIn,float* samplesOut,
                                              size_t sample);
 
@@ -72,12 +73,15 @@ private:
     //Function is called to add parameter into treeState vector.
     std::unique_ptr<juce::AudioParameterBool> boolParameterAsPointer(juce::String id, juce::String name, float defaultValue);
 
+    // Function used to add float parameter to TreeState vector
     void addFloatParameterPointerToVector(std::vector <std::unique_ptr<juce::RangedAudioParameter>>& params,
                                           std::unique_ptr<juce::AudioParameterFloat>& parameter);
 
+    // Function used to add bool parameter to TreeState vector
     void addBoolParameterPointerToVector(std::vector <std::unique_ptr<juce::RangedAudioParameter>>& params,
                                           std::unique_ptr<juce::AudioParameterBool>& parameter);
 
+    // Function is used to alter levels of the output and set the phase.
     void levelOfOutput(float* samplesOut, size_t sample, float input, float mix, float delayOutput, float gain,
                        float phase);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
