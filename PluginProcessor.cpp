@@ -1,5 +1,7 @@
 #include "PluginProcessor.h"
 
+// Delay Plugin
+// If using projucer to recreate make sure you include "juce_dsp" in modules.
 //==============================================================================
 AudioPluginAudioProcessor::AudioPluginAudioProcessor()
         : AudioProcessor (BusesProperties()
@@ -164,13 +166,11 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     const auto numChannels = juce::jmax (totalNumInputChannels, totalNumOutputChannels);
 
-
     auto toggle = treeState.getRawParameterValue("toggle")->load();
-
-
 
     for (size_t channel = 0; channel < numChannels; ++channel)
     {
+        // If toggle is 0 we don't do any delay processing
         if (toggle == 0)
         {
             continue;
@@ -215,6 +215,7 @@ void AudioPluginAudioProcessor::delayProcess(juce::AudioBuffer<float>& buffer,si
     // Stating inital delay time.
     delayModule.setDelay(getParameterValue("delay")/ 1000.0f * getSampleRate());
 
+    // Accessing buffer through audioBlock dsp.
     auto audioBlock = juce::dsp::AudioBlock<float> (buffer).getSubsetChannelBlock (0, (size_t) numChannels);
 
     // Context is used to get input and output information.
