@@ -55,8 +55,6 @@ private:
     //dsp module, delayLine is used to handle the delay signals.
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayModule { effectDelaySamples };
 
-    // TODO Find out what this does
-    std::array<float, 2> delayValue { {} };
     void delayProcess(juce::AudioBuffer<float>& buffer,size_t channel, int numChannels);
 
     // Function is used to create the parameter layout, parameter attributes are stored here.
