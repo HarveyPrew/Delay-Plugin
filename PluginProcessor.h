@@ -85,6 +85,7 @@ private:
     void levelOfOutput(float* samplesOut, size_t sample, float input, float mix, float delayOutput, float gain,
                        float phase);
 
+    // Function used to get parameter value from Tree State.
     float getParameterValue(juce::String parameterID);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };
