@@ -84,5 +84,7 @@ private:
     // Function is used to alter levels of the output and set the phase.
     void levelOfOutput(float* samplesOut, size_t sample, float input, float mix, float delayOutput, float gain,
                        float phase);
+
+    float getParameterValue(juce::String parameterID);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };

@@ -212,8 +212,8 @@ void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeI
 
 void AudioPluginAudioProcessor::delayProcess(juce::AudioBuffer<float>& buffer,size_t channel, int numChannels)
 {
-    // Stating the delay time.
-    delayModule.setDelay(treeState.getRawParameterValue("delay")->load() / 1000.0f * getSampleRate());
+    // Stating inital delay time.
+    delayModule.setDelay(getParameterValue("delay")/ 1000.0f * getSampleRate());
 
     auto audioBlock = juce::dsp::AudioBlock<float> (buffer).getSubsetChannelBlock (0, (size_t) numChannels);
 
@@ -240,7 +240,7 @@ void AudioPluginAudioProcessor::addingSamplesToOutputAndDelayModule(size_t chann
     // we are taking in the input samples
     auto input = samplesIn[sample];
 
-    auto feedback = treeState.getRawParameterValue("feedback")->load()*0.01;
+    auto feedback = getParameterValue("feedback")*0.01;
 
     //made an input for delay which is the combination of the input samples and feedback * delayoutput
     auto inputForDelay = samplesIn[sample] + feedback*delayOutput;
@@ -248,9 +248,9 @@ void AudioPluginAudioProcessor::addingSamplesToOutputAndDelayModule(size_t chann
     // pushing input sample + delayOutput into delay module
     delayModule.pushSample((int)channel, inputForDelay);
 
-    auto phase = treeState.getRawParameterValue("phase")->load();
-    auto mix = treeState.getRawParameterValue("mix")->load()*0.01;
-    auto gain = treeState.getRawParameterValue("gain")->load();
+    auto phase = getParameterValue("phase");
+    auto mix = getParameterValue("mix")*0.01;
+    auto gain = getParameterValue("gain");
 
     if (phase == 0)
     {
@@ -292,6 +292,11 @@ void AudioPluginAudioProcessor::levelOfOutput(float* samplesOut, size_t sample, 
                                               float delayOutput, float gain, float phase){
     // Combining both input and delayed sample
     samplesOut[sample] = (input*(1 - mix) + delayOutput*mix) * gain * phase;
+}
+
+float AudioPluginAudioProcessor::getParameterValue(juce::String parameterID)
+{
+    return treeState.getRawParameterValue(parameterID)->load();
 }
 
 //==============================================================================
