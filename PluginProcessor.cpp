@@ -123,7 +123,6 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
 
     // Resetting to make sure any data from before is removed
     delayModule.reset();
-    std::fill (lastDelayOutput.begin(), lastDelayOutput.end(), 0.0f);
     delayModule.setDelay(treeState.getRawParameterValue("delay")->load() / 1000.0f * getSampleRate());
 }
 
@@ -218,6 +217,8 @@ void AudioPluginAudioProcessor::delayProcess(juce::AudioBuffer<float>& buffer,si
     delayModule.setDelay(treeState.getRawParameterValue("delay")->load() / 1000.0f * getSampleRate());
 
     auto audioBlock = juce::dsp::AudioBlock<float> (buffer).getSubsetChannelBlock (0, (size_t) numChannels);
+
+    // Context is used to get input and output information.
     auto context = juce::dsp::ProcessContextReplacing<float>(audioBlock);
     auto& input = context.getInputBlock();
     auto& output = context.getOutputBlock();
@@ -233,7 +234,7 @@ void AudioPluginAudioProcessor::delayProcess(juce::AudioBuffer<float>& buffer,si
 void AudioPluginAudioProcessor::addingSamplesToOutputAndDelayModule(size_t channel, const float* samplesIn,
                                                                     float* samplesOut, size_t sample) {
     // extracting output of delay sample
-    // the popSample task takes what's in the delayModule and puts it in delayOutput
+    // popSample takes what's in the delayModule and puts it in delayOutput
     auto delayOutput = delayModule.popSample((int)channel);
 
     // Input Sample
@@ -241,6 +242,7 @@ void AudioPluginAudioProcessor::addingSamplesToOutputAndDelayModule(size_t chann
     auto input = samplesIn[sample];
 
     auto feedback = treeState.getRawParameterValue("feedback")->load()*0.01;
+
     //made an input for delay which is the combination of the input samples and feedback * delayoutput
     auto inputForDelay = samplesIn[sample] + feedback*delayOutput;
 

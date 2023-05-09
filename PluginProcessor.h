@@ -56,9 +56,6 @@ private:
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayModule { effectDelaySamples };
 
     // TODO Find out what this does
-    std::array<float, 2> lastDelayOutput;
-
-    // TODO Find out what this does
     std::array<float, 2> delayValue { {} };
     void delayProcess(juce::AudioBuffer<float>& buffer,size_t channel, int numChannels);
 
