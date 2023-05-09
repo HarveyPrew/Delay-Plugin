@@ -112,13 +112,16 @@ void AudioPluginAudioProcessor::changeProgramName (int index, const juce::String
 //==============================================================================
 void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Initialize spec for dsp modules
+    // To use the dsp module we need to pass it specs.
     juce::dsp::ProcessSpec spec;
     spec.maximumBlockSize = samplesPerBlock;
     spec.sampleRate = sampleRate;
     spec.numChannels = getTotalNumOutputChannels();
 
+    // Initialising the processor
     delayModule.prepare(spec);
+
+    // Resetting to make sure any data from before is removed
     delayModule.reset();
     std::fill (lastDelayOutput.begin(), lastDelayOutput.end(), 0.0f);
     delayModule.setDelay(treeState.getRawParameterValue("delay")->load() / 1000.0f * getSampleRate());
@@ -211,7 +214,7 @@ void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeI
 
 void AudioPluginAudioProcessor::delayProcess(juce::AudioBuffer<float>& buffer,size_t channel, int numChannels)
 {
-    // Resetting the delay time
+    // Stating the delay time.
     delayModule.setDelay(treeState.getRawParameterValue("delay")->load() / 1000.0f * getSampleRate());
 
     auto audioBlock = juce::dsp::AudioBlock<float> (buffer).getSubsetChannelBlock (0, (size_t) numChannels);
@@ -250,13 +253,12 @@ void AudioPluginAudioProcessor::addingSamplesToOutputAndDelayModule(size_t chann
 
     if (phase == 0)
     {
-        // Combining both input and delayed sample
-        samplesOut[sample] = (input*(1 - mix) + delayOutput*mix) * gain;
+        levelOfOutput(samplesOut, sample, input, mix, delayOutput, gain, 1);
     }
     else
     {
-        // Adding phase
-        samplesOut[sample] = (input*(1 - mix) + delayOutput*mix) * gain * -1;
+        // Phase being - 1 allows us to invert the samples.
+        levelOfOutput(samplesOut, sample, input, mix, delayOutput, gain, -1);
     }
 
 }
@@ -283,6 +285,12 @@ void AudioPluginAudioProcessor::addBoolParameterPointerToVector(
         std::vector<std::unique_ptr<juce::RangedAudioParameter>> &params,
         std::unique_ptr<juce::AudioParameterBool> &parameter) {
     params.push_back(std::move(parameter));
+}
+
+void AudioPluginAudioProcessor::levelOfOutput(float* samplesOut, size_t sample, float input, float mix,
+                                              float delayOutput, float gain, float phase){
+    // Combining both input and delayed sample
+    samplesOut[sample] = (input*(1 - mix) + delayOutput*mix) * gain * phase;
 }
 
 //==============================================================================

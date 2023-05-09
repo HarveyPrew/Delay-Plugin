@@ -51,8 +51,14 @@ private:
 
     // 192000 Is the highest possible sample rate.
     static constexpr auto effectDelaySamples = 192000;
+
+    //dsp module, delayLine is used to handle the delay signals.
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayModule { effectDelaySamples };
+
+    // TODO Find out what this does
     std::array<float, 2> lastDelayOutput;
+
+    // TODO Find out what this does
     std::array<float, 2> delayValue { {} };
     void delayProcess(juce::AudioBuffer<float>& buffer,size_t channel, int numChannels);
 
@@ -76,5 +82,8 @@ private:
 
     void addBoolParameterPointerToVector(std::vector <std::unique_ptr<juce::RangedAudioParameter>>& params,
                                           std::unique_ptr<juce::AudioParameterBool>& parameter);
+
+    void levelOfOutput(float* samplesOut, size_t sample, float input, float mix, float delayOutput, float gain,
+                       float phase);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };
